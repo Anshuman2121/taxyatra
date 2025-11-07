@@ -1,0 +1,109 @@
+USERNAME="ABTPC3954F"
+PASSWORD="Nathani@2017"
+
+
+fetch("https://eportal.incometax.gov.in/iec/loginapi/login", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+    "content-type": "application/json",
+    "sec-ch-ua": "\"Brave\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"macOS\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "sec-gpc": "1",
+    "sn": "wLoginService",
+    "cookie": "693c4e2771754eedb1d75ba0debd40d8=b1587ec1a66019808fa6c1f5da68bde8; ddcc1e8fa206097320e8c7a3b92191ff=29d2aa60cc37e4549f7571c2411d5295; 4a75cee7266fb5ae654dc5e51e6a9fe3=2ac607d8e3c1ff059ec8f4e598ade41d; cda5f4d60b756653ef27a4733f4617c6=7781ed1c0280ea66d5195137b636bca2; 64912cb2ff2ddd44f1b8a0441cd026fb=b20046205cda99c824167a475ba25d68; 735f08284897d8257a5156fc6c214f76=ad3beb8f281e822c881d5708b7bebc8a; cb75fe3af6a15223fa5633039e60ed6f=4af942bc62773725f1a24797932eb8cc; 1580efbee52cfd917d7413e4b29c4e2e=f5374413f4080825686d361dcdea0470; 49f6fb1f55554861258cb8d75043adee=0a030a56b9916bcd45bbd2ac7ec785c9; 2dcbb10b317da85bc2e359274540dc79=fed60716b324757a7dc36bbc4c57ffaf; eae3f7faaf0d5a512766019097a0d512=dcb0e4021f14d9450414dd9775dbd055",
+    "Referer": "https://eportal.incometax.gov.in/iec/foservices/"
+  },
+  "body": "{\"entity\":\"ABTPC3954F\",\"serviceName\":\"wLoginService\"}",
+  "method": "POST"
+});
+
+Response:[{
+    "header": {
+        "formName": null
+    },
+    "messages": [
+        {
+            "code": "EF00000",
+            "type": "INFO",
+            "desc": "OK",
+            "fieldName": null
+        }
+    ],
+    "errors": [],
+    "reqId": "FOS008159607861",
+    "entity": "ABTPC3954F",
+    "entityType": "PAN",
+    "role": "IN",
+    "uidValdtnFlg": "true",
+    "aadhaarMobileValidated": "false",
+    "secAccssMsg": "",
+    "secLoginOptions": "",
+    "dtoService": "LOGIN",
+    "exemptedPan": "false",
+    "userConsent": "N",
+    "imgByte": ""
+}]
+
+
+fetch("https://eportal.incometax.gov.in/iec/loginapi/login", {
+    "headers": {
+      "accept": "application/json, text/plain, */*",
+      "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+      "content-type": "application/json",
+      "sec-ch-ua": "\"Brave\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin",
+      "sec-gpc": "1",
+      "sn": "loginService",
+      "cookie": "693c4e2771754eedb1d75ba0debd40d8=b1587ec1a66019808fa6c1f5da68bde8; ddcc1e8fa206097320e8c7a3b92191ff=29d2aa60cc37e4549f7571c2411d5295; 4a75cee7266fb5ae654dc5e51e6a9fe3=2ac607d8e3c1ff059ec8f4e598ade41d; cda5f4d60b756653ef27a4733f4617c6=7781ed1c0280ea66d5195137b636bca2; 64912cb2ff2ddd44f1b8a0441cd026fb=b20046205cda99c824167a475ba25d68; 735f08284897d8257a5156fc6c214f76=ad3beb8f281e822c881d5708b7bebc8a; cb75fe3af6a15223fa5633039e60ed6f=4af942bc62773725f1a24797932eb8cc; 1580efbee52cfd917d7413e4b29c4e2e=f5374413f4080825686d361dcdea0470; 49f6fb1f55554861258cb8d75043adee=0a030a56b9916bcd45bbd2ac7ec785c9; 2dcbb10b317da85bc2e359274540dc79=fed60716b324757a7dc36bbc4c57ffaf; eae3f7faaf0d5a512766019097a0d512=dcb0e4021f14d9450414dd9775dbd055",
+      "Referer": "https://eportal.incometax.gov.in/iec/foservices/"
+    },
+    "body": "{\"errors\":[],\"reqId\":\"FOS008159607861\",\"entity\":\"ABTPC3954F\",\"entityType\":\"PAN\",\"role\":\"IN\",\"uidValdtnFlg\":\"true\",\"aadhaarMobileValidated\":\"false\",\"secAccssMsg\":\"\",\"secLoginOptions\":\"\",\"dtoService\":\"LOGIN\",\"exemptedPan\":\"false\",\"userConsent\":\"N\",\"imgByte\":null,\"pass\":\"TmF0aGFuaUAyMDE3\",\"passValdtnFlg\":null,\"otpGenerationFlag\":null,\"otp\":null,\"otpValdtnFlg\":null,\"otpSourceFlag\":null,\"contactPan\":null,\"contactMobile\":null,\"contactEmail\":null,\"email\":null,\"mobileNo\":null,\"forgnDirEmailId\":null,\"imagePath\":null,\"serviceName\":\"loginService\"}",
+    "method": "POST"
+  });
+
+Response:[
+    {
+        "header": {
+            "formName": null
+        },
+        "messages": [
+            {
+                "code": "EF00000",
+                "type": "INFO",
+                "desc": "OK",
+                "fieldName": null
+            }
+        ],
+        "errors": [],
+        "reqId": "FOS008159607861",
+        "entity": "ABTPC3954F",
+        "entityType": "PAN",
+        "role": "IN",
+        "userType": "IND",
+        "uidValdtnFlg": "true",
+        "passValdtnFlg": "true",
+        "mobileNo": "OTkzNDY0NjcyMQ==",
+        "email": "cm9oaXRrcmlzaG5hamhhQHJlZGlmZm1haWwuY29t",
+        "aadhaarMobileValidated": "false",
+        "secAccssMsg": "",
+        "secLoginOptions": "",
+        "dtoService": "LOGIN",
+        "lastLoginSuccessFlag": "true",
+        "fullName": "PAN CHOUDHARY",
+        "clientIp": "49.47.130.55",
+        "exemptedPan": "false",
+        "userConsent": "N",
+        "sessionTime": "15",
+        "inopCheck": "false"
+    }
+]
+
