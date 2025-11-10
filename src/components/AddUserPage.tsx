@@ -93,18 +93,12 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
     }
 
     setIsLoading(true);
+    setUserData(null);
     try {
       const result = await window.electronAPI.fetchUserProfile(pan, password);
-      if (result.success) {
-        alert('Profile fetched and saved successfully!');
-        // Save credentials and reload user data
-        await window.electronAPI.savePanCredentials(pan, password);
-        await loadUserData(pan);
-      } else {
-        alert(`Error: ${result.message}`);
-      }
+      setUserData(result);
     } catch (error) {
-      alert('Error fetching profile. Please check your credentials and internet connection.');
+      setUserData({ error: error.message });
     } finally {
       setIsLoading(false);
     }
@@ -170,19 +164,13 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
                   </div>
                 </div>
                 
-                {/* Display user data if available */}
-                {userData && userData.user && (
-                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-left">
-                    <h3 className="text-sm font-semibold text-green-800 mb-2">Profile Data</h3>
-                    <div className="text-xs text-green-700 space-y-1">
-                      <p><strong>Name:</strong> {userData.user.fullName}</p>
-                      <p><strong>Mobile:</strong> {userData.user.mobileNo}</p>
-                      <p><strong>Email:</strong> {userData.user.email}</p>
-                      <p><strong>Address:</strong> {userData.user.addrLine1Txt}, {userData.user.addrLine4Txt}</p>
-                      {userData.bankAccounts && userData.bankAccounts.length > 0 && (
-                        <p><strong>Bank Accounts:</strong> {userData.bankAccounts.length} account(s) found</p>
-                      )}
-                    </div>
+                {/* Display API response */}
+                {userData && (
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-left max-h-96 overflow-auto">
+                    <h3 className="text-sm font-semibold text-blue-800 mb-2">API Response</h3>
+                    <pre className="text-xs text-blue-700 whitespace-pre-wrap">
+                      {JSON.stringify(userData, null, 2)}
+                    </pre>
                   </div>
                 )}
                 

@@ -73,36 +73,53 @@ class ITRApiService {
     this.axiosInstance = wrapper(axios.create({
       jar: this.cookieJar,
       withCredentials: true,
+      maxRedirects: 5,
       headers: {
         'Accept-Language': 'en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
       }
     }));
+    
+    // Log all requests and responses
+    this.axiosInstance.interceptors.request.use(config => {
+      console.log('Request:', config.method?.toUpperCase(), config.url);
+      return config;
+    });
+    
+    this.axiosInstance.interceptors.response.use(response => {
+      if (response.headers['set-cookie']) {
+        console.log('Set-Cookie headers:', response.headers['set-cookie']);
+      }
+      return response;
+    });
   }
 
   private async initializeSession(): Promise<void> {
     if (this.sessionInitialized) return;
 
     try {
-      console.log('Initializing session by visiting main page...');
+      console.log('Initializing session...');
       await this.axiosInstance.get('https://eportal.incometax.gov.in/iec/foservices/', {
         headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Connection': 'keep-alive'
         }
       });
 
-      // Update headers for API calls
       this.axiosInstance.defaults.headers['Content-Type'] = 'application/json';
       this.axiosInstance.defaults.headers['Accept'] = 'application/json, text/plain, */*';
+      this.axiosInstance.defaults.headers['Origin'] = 'https://eportal.incometax.gov.in';
       this.axiosInstance.defaults.headers['Referer'] = 'https://eportal.incometax.gov.in/iec/foservices/';
+      this.axiosInstance.defaults.headers['Connection'] = 'keep-alive';
       this.axiosInstance.defaults.headers['Sec-Fetch-Dest'] = 'empty';
       this.axiosInstance.defaults.headers['Sec-Fetch-Mode'] = 'cors';
       this.axiosInstance.defaults.headers['Sec-Fetch-Site'] = 'same-origin';
+      this.axiosInstance.defaults.headers['Sec-GPC'] = '1';
 
       this.sessionInitialized = true;
-      console.log('Session initialized successfully');
+      console.log('Session initialized');
     } catch (error) {
-      console.error('Failed to initialize session:', error.message);
+      console.error('Session init failed:', error.message);
       throw new Error('Failed to initialize session');
     }
   }
@@ -110,6 +127,8 @@ class ITRApiService {
   async login(username: string, password: string): Promise<LoginResponse> {
     try {
       await this.initializeSession();
+
+      console.log('Cookies before first call:', await this.cookieJar.getCookies('https://eportal.incometax.gov.in'));
 
       // First login call
       const firstResponse = await this.axiosInstance.post(`${BASE_URL}/loginapi/login`, {
@@ -122,6 +141,7 @@ class ITRApiService {
       });
 
       console.log('First response:', JSON.stringify(firstResponse.data, null, 2));
+      console.log('Cookies after first call:', await this.cookieJar.getCookies('https://eportal.incometax.gov.in'));
 
       const firstData = Array.isArray(firstResponse.data) ? firstResponse.data[0] : firstResponse.data;
       
@@ -133,6 +153,18 @@ class ITRApiService {
       const secondResponse = await this.axiosInstance.post(`${BASE_URL}/loginapi/login`, {
         ...firstData,
         pass: Buffer.from(password).toString('base64'),
+        passValdtnFlg: null,
+        otpGenerationFlag: null,
+        otp: null,
+        otpValdtnFlg: null,
+        otpSourceFlag: null,
+        contactPan: null,
+        contactMobile: null,
+        contactEmail: null,
+        email: null,
+        mobileNo: null,
+        forgnDirEmailId: null,
+        imagePath: null,
         serviceName: 'loginService'
       }, {
         headers: {
@@ -156,7 +188,6 @@ class ITRApiService {
         }
       }
 
-      // For now, let's proceed even if passValdtnFlg is not set, as the API structure might be different
       console.log('Login completed, passValdtnFlg:', loginData.passValdtnFlg);
 
       return loginData;
