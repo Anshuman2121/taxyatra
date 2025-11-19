@@ -1,6 +1,6 @@
 import ITRApiService from './api';
-import { UserModel } from '../database/models/User';
-import { getDatabase } from '../database/database';
+import { UserModel } from '../database/repositories/user.repository';
+import { getDatabase } from '../database/connection';
 
 class UserDataService {
   private userModel: UserModel | null = null;
@@ -17,11 +17,11 @@ class UserDataService {
     return this.userModel;
   }
 
-  async fetchAndSaveUserProfile(username: string, password: string): Promise<void> {
+  async fetchAndSaveUserProfile(username: string, password: string, cookies?: any[]): Promise<void> {
     try {
       // Fetch all user data from API
-      const userData = await ITRApiService.fetchAllUserData(username, password);
-      
+      const userData = await ITRApiService.fetchAllUserData(username, password, cookies);
+
       const pan = userData.login.entity;
 
       // Prepare user data for database

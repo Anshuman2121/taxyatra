@@ -43,6 +43,10 @@ interface BankAccount {
   nameAsPerBank: string;
   accountType: string;
   status: string;
+  submitDt?: number;
+  validDt?: number;
+  refundFlag?: string;
+  accountStatus?: string;
 }
 
 interface BankDetailsResponse {
@@ -79,13 +83,13 @@ class ITRApiService {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
       }
     }));
-    
+
     // Log all requests and responses
     this.axiosInstance.interceptors.request.use(config => {
       console.log('Request:', config.method?.toUpperCase(), config.url);
       return config;
     });
-    
+
     this.axiosInstance.interceptors.response.use(response => {
       if (response.headers['set-cookie']) {
         console.log('Set-Cookie headers:', response.headers['set-cookie']);
@@ -144,11 +148,11 @@ class ITRApiService {
       console.log('Cookies after first call:', await this.cookieJar.getCookies('https://eportal.incometax.gov.in'));
 
       const firstData = Array.isArray(firstResponse.data) ? firstResponse.data[0] : firstResponse.data;
-      
+
       if (!firstData || !firstData.entity) {
         throw new Error('Invalid response from first login call');
       }
-      
+
       // Second login call with password
       const secondResponse = await this.axiosInstance.post(`${BASE_URL}/loginapi/login`, {
         ...firstData,
@@ -182,7 +186,7 @@ class ITRApiService {
 
       // Check for authentication errors
       if (loginData.messages) {
-        const errorMessage = loginData.messages.find(msg => msg.type === 'ERROR');
+        const errorMessage = loginData.messages.find((msg: any) => msg.type === 'ERROR');
         if (errorMessage) {
           throw new Error(`Login failed: ${errorMessage.desc}`);
         }
@@ -272,19 +276,45 @@ class ITRApiService {
     }
   }
 
-  async fetchAllUserData(username: string, password: string) {
+  async setCookies(cookies: any[]) {
+    for (const cookie of cookies) {
+      await this.cookieJar.setCookie(
+        `${cookie.name}=${cookie.value}; domain=${cookie.domain}; path=${cookie.path}`,
+        `https://${cookie.domain}${cookie.path}`
+      );
+    }
+    this.sessionInitialized = true;
+  }
+
+  async fetchAllUserData(username: string, password: string, cookies?: any[]) {
     try {
-      // Login first
-      const loginData = await this.login(username, password);
-      
+      let loginData: LoginResponse;
+
+      if (cookies && cookies.length > 0) {
+        console.log('Using provided cookies for session...');
+        await this.setCookies(cookies);
+        // Construct minimal login data since we skipped actual login API
+        loginData = {
+          reqId: '',
+          entity: username,
+          entityType: 'PAN',
+          role: '', // Unknown without login response
+          userType: '', // Unknown without login response
+          fullName: '', // Will be populated from profile
+        };
+      } else {
+        // Login first
+        loginData = await this.login(username, password);
+      }
+
       if (!loginData || !loginData.entity) {
         throw new Error('Login failed: No valid entity found');
       }
-      
+
       // For now, let's try to fetch data even if authentication might be partial
       // This will help us understand what's working and what's not
       console.log('Attempting to fetch user data with entity:', loginData.entity);
-      
+
       try {
         // Fetch all user data
         const [userProfile, bankDetails, jurisdictionDetails, itrDetails] = await Promise.all([
@@ -293,6 +323,11 @@ class ITRApiService {
           this.getJurisdictionDetails(loginData.entity),
           this.getITRDetails()
         ]);
+
+        // Enrich login data with profile info if missing
+        if (!loginData.fullName && userProfile) {
+          loginData.fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
+        }
 
         return {
           login: loginData,

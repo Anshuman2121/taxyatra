@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { api } from '../api';
 import { TopNavBar } from './TopNavBar';
 import { BottomBar } from './BottomBar';
 import {
@@ -25,12 +26,12 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    loadPanCredentials();
+    loadCredentials();
   }, [refreshTrigger]);
 
-  const loadPanCredentials = async () => {
+  const loadCredentials = async () => {
     try {
-      const credentials = await window.electronAPI.getPanCredentials();
+      const credentials = await api.getPanCredentials();
       setPanCredentials(credentials);
     } catch (error) {
       console.error('Error loading PAN credentials:', error);
@@ -62,7 +63,7 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 relative overflow-hidden">
       <TopNavBar pageName="Inventory" />
-      
+
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-20 sm:-top-40 -right-20 sm:-right-40 w-40 h-40 sm:w-80 sm:h-80 bg-gradient-to-br from-gray-300/30 to-slate-400/30 rounded-full blur-3xl"></div>
@@ -93,8 +94,8 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
                     panCredentials.map((credential, index) => (
                       <TableRow key={credential.pan} className="border-b border-gray-300/50">
                         <TableCell className="border-r border-gray-300/50">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             className="rounded border-gray-300"
                             checked={selectedUsers.has(credential.pan)}
                             onChange={(e) => handleUserSelection(credential.pan, e.target.checked)}
@@ -106,7 +107,7 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
                         <TableCell className="border-r border-gray-300/50">{credential.pan}</TableCell>
                         <TableCell className="border-r border-gray-300/50">N</TableCell>
                         <TableCell>
-                          <button 
+                          <button
                             onClick={() => onNavigate('add-user', credential.pan)}
                             className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors"
                           >
@@ -139,7 +140,7 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
                 <div className="text-2xl sm:text-3xl mb-2 group-hover:scale-110 transition-transform">👤</div>
                 <div className="text-xs sm:text-sm font-medium text-gray-800">Add User</div>
               </button>
-              
+
               <button
                 onClick={handleEdit}
                 className="bg-white/60 backdrop-blur-md border border-gray-200/50 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-all duration-200 shadow-lg hover:shadow-xl group"
@@ -147,22 +148,22 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
                 <div className="text-2xl sm:text-3xl mb-2 group-hover:scale-110 transition-transform">✏️</div>
                 <div className="text-xs sm:text-sm font-medium text-gray-800">Change</div>
               </button>
-              
+
               <button className="bg-white/60 backdrop-blur-md border border-gray-200/50 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-all duration-200 shadow-lg hover:shadow-xl group">
                 <div className="text-2xl sm:text-3xl mb-2 group-hover:scale-110 transition-transform">🗑️</div>
                 <div className="text-xs sm:text-sm font-medium text-gray-800">Delete</div>
               </button>
-              
+
               <button className="bg-white/60 backdrop-blur-md border border-gray-200/50 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-all duration-200 shadow-lg hover:shadow-xl group">
                 <div className="text-2xl sm:text-3xl mb-2 group-hover:scale-110 transition-transform">📥</div>
                 <div className="text-xs sm:text-sm font-medium text-gray-800">Import</div>
               </button>
-              
+
               <button className="bg-white/60 backdrop-blur-md border border-gray-200/50 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-all duration-200 shadow-lg hover:shadow-xl group">
                 <div className="text-2xl sm:text-3xl mb-2 group-hover:scale-110 transition-transform">🔒</div>
                 <div className="text-xs sm:text-sm font-medium text-gray-800">Lock</div>
               </button>
-              
+
               <button className="bg-white/60 backdrop-blur-md border border-gray-200/50 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-all duration-200 shadow-lg hover:shadow-xl group">
                 <div className="text-2xl sm:text-3xl mb-2 group-hover:scale-110 transition-transform">📤</div>
                 <div className="text-xs sm:text-sm font-medium text-gray-800">Export</div>

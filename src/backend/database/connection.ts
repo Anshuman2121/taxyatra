@@ -13,18 +13,20 @@ export function initDatabase(): Promise<Database> {
     const userDataPath = app.getPath('userData');
     const dbPath = path.join(userDataPath, DB_FILE);
     const encryptedDbPath = path.join(userDataPath, ENCRYPTED_DB_FILE);
-    
-    // Load encrypted database if exists
-    if (fs.existsSync(encryptedDbPath)) {
-      try {
-        const encryptedData = fs.readFileSync(encryptedDbPath, 'utf8');
-        const decryptedData = decryptData(encryptedData);
-        fs.writeFileSync(dbPath, decryptedData, 'binary');
-      } catch (error) {
-        console.error('Failed to decrypt database:', error);
-      }
-    }
-    
+
+    console.log('Database path:', dbPath);
+
+    // Load encrypted database if exists (disabled for now)
+    // if (fs.existsSync(encryptedDbPath)) {
+    //   try {
+    //     const encryptedData = fs.readFileSync(encryptedDbPath, 'utf8');
+    //     const decryptedData = decryptData(encryptedData);
+    //     fs.writeFileSync(dbPath, decryptedData, 'binary');
+    //   } catch (error) {
+    //     console.error('Failed to decrypt database:', error);
+    //   }
+    // }
+
     db = new Database(dbPath, (err) => {
       if (err) {
         reject(err);
@@ -43,7 +45,7 @@ export function initDatabase(): Promise<Database> {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )
         `);
-        
+
         // Create inventory table
         db.run(`
           CREATE TABLE IF NOT EXISTS inventory (
@@ -55,7 +57,7 @@ export function initDatabase(): Promise<Database> {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )
         `);
-        
+
         // Create pan_credentials table
         db.run(`
           CREATE TABLE IF NOT EXISTS pan_credentials (
@@ -150,28 +152,11 @@ export function getDatabase(): Database {
 
 export function closeDatabase(): void {
   if (db) {
-    const userDataPath = app.getPath('userData');
-    const dbPath = path.join(userDataPath, DB_FILE);
-    const encryptedDbPath = path.join(userDataPath, ENCRYPTED_DB_FILE);
-    
     db.close((err) => {
       if (err) {
         console.error('Error closing database:', err);
-        return;
-      }
-
-      // Encrypt and save database
-      try {
-        if (fs.existsSync(dbPath)) {
-          const dbData = fs.readFileSync(dbPath, 'binary');
-          const encryptedData = encryptData(dbData);
-          fs.writeFileSync(encryptedDbPath, encryptedData);
-          
-          // Remove unencrypted file
-          fs.unlinkSync(dbPath);
-        }
-      } catch (error) {
-        console.error('Failed to encrypt database:', error);
+      } else {
+        console.log('Database closed successfully');
       }
     });
   }

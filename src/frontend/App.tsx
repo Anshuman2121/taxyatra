@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActivationPage } from './components/ActivationPage';
 import { HomePage } from './components/HomePage';
 import { AddUserPage } from './components/AddUserPage';
+import { api } from './api';
 
 function App() {
   const [isActivated, setIsActivated] = useState<boolean | null>(null);
@@ -14,12 +15,12 @@ function App() {
   }, []);
 
   const checkActivationStatus = async () => {
-    const activated = await window.electronAPI.checkActivation();
+    const activated = await api.checkActivation();
     setIsActivated(activated);
   };
 
   const handleActivation = async (code: string): Promise<boolean> => {
-    const isValid = await window.electronAPI.validateActivationCode(code);
+    const isValid = await api.validateActivationCode(code);
     if (isValid) {
       setIsActivated(true);
       return true;
