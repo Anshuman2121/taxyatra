@@ -5,9 +5,8 @@ import { getDatabase } from '../database/connection';
 class UserDataService {
   private userModel: UserModel | null = null;
 
-  async initializeTables(): Promise<void> {
+  constructor() {
     this.userModel = new UserModel(getDatabase());
-    await this.userModel.createTables();
   }
 
   private ensureUserModel(): UserModel {

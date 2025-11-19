@@ -21,15 +21,18 @@ export function registerAuthHandlers() {
         }
     });
 
-    ipcMain.handle('save-pan-credentials', (_, pan: string, password: string) => {
+    ipcMain.handle('save-pan-credentials', async (_, pan: string, password: string) => {
         try {
-            const db = getDatabase();
-            db.run('INSERT OR REPLACE INTO pan_credentials (pan, password, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-                [pan, password], (err) => {
-                    if (err) {
-                        console.error('Error saving PAN credentials:', err);
-                    }
-                });
+            const pool = getDatabase();
+            if (!pool) return false;
+
+            await pool.query(`
+                INSERT INTO "pan_credentials" ("pan", "password", "updated_at") 
+                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                ON CONFLICT ("pan") DO UPDATE SET 
+                "password" = EXCLUDED."password", 
+                "updated_at" = CURRENT_TIMESTAMP
+            `, [pan, password]);
             return true;
         } catch (error) {
             console.error('Error saving PAN credentials:', error);
@@ -37,41 +40,29 @@ export function registerAuthHandlers() {
         }
     });
 
-    ipcMain.handle('get-pan-credentials', () => {
-        return new Promise((resolve, reject) => {
-            try {
-                const db = getDatabase();
-                db.all('SELECT pan, created_at FROM pan_credentials ORDER BY created_at DESC', (err, rows) => {
-                    if (err) {
-                        console.error('Error getting PAN credentials:', err);
-                        resolve([]);
-                    } else {
-                        resolve(rows);
-                    }
-                });
-            } catch (error) {
-                console.error('Error getting PAN credentials:', error);
-                resolve([]);
-            }
-        });
+    ipcMain.handle('get-pan-credentials', async () => {
+        try {
+            const pool = getDatabase();
+            if (!pool) return [];
+
+            const res = await pool.query('SELECT "pan", "created_at" FROM "pan_credentials" ORDER BY "created_at" DESC');
+            return res.rows;
+        } catch (error) {
+            console.error('Error getting PAN credentials:', error);
+            return [];
+        }
     });
 
-    ipcMain.handle('get-pan-with-password', (_, pan: string) => {
-        return new Promise((resolve, reject) => {
-            try {
-                const db = getDatabase();
-                db.get('SELECT pan, password FROM pan_credentials WHERE pan = ?', [pan], (err, row) => {
-                    if (err) {
-                        console.error('Error getting PAN with password:', err);
-                        resolve(null);
-                    } else {
-                        resolve(row);
-                    }
-                });
-            } catch (error) {
-                console.error('Error getting PAN with password:', error);
-                resolve(null);
-            }
-        });
+    ipcMain.handle('get-pan-with-password', async (_, pan: string) => {
+        try {
+            const pool = getDatabase();
+            if (!pool) return null;
+
+            const res = await pool.query('SELECT "pan", "password" FROM "pan_credentials" WHERE "pan" = $1', [pan]);
+            return res.rows[0] || null;
+        } catch (error) {
+            console.error('Error getting PAN with password:', error);
+            return null;
+        }
     });
 }

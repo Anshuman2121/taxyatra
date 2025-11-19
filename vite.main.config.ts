@@ -9,7 +9,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'electron',
-        'sqlite3',
+        'pg',
         ...builtinModules,
         ...builtinModules.map(m => `node:${m}`)
       ]

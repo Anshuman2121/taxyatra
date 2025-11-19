@@ -43,7 +43,6 @@ const createWindow = () => {
 app.on('ready', async () => {
     try {
         await initDatabase();
-        await userDataService.initializeTables();
         registerIpcHandlers();
         createWindow();
     } catch (error) {
