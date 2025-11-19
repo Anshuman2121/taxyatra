@@ -11,5 +11,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPanWithPassword: (pan: string) => ipcRenderer.invoke('get-pan-with-password', pan),
   fetchUserProfile: (pan: string, password: string) => ipcRenderer.invoke('fetch-user-profile', pan, password),
   getUserData: (pan: string) => ipcRenderer.invoke('get-user-data', pan),
-  onFetchProgress: (callback: (event: any, status: string) => void) => ipcRenderer.on('fetch-progress', callback)
+  onFetchProgress: (callback: (event: any, status: string) => void) => ipcRenderer.on('fetch-progress', callback),
+  // Registration API
+  checkRegistration: () => ipcRenderer.invoke('registration:check'),
+  submitRegistration: (licenseKey: string) => ipcRenderer.invoke('registration:submit', licenseKey),
+  getMachineId: () => ipcRenderer.invoke('registration:machine-id'),
+  getLicenseDetails: () => ipcRenderer.invoke('registration:details'),
+  revokeLicense: () => ipcRenderer.invoke('registration:revoke')
 });

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { OnlineStatus } from './OnlineStatus';
+import { LicenseDetailsModal } from './LicenseDetailsModal';
+import { Key } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,8 +18,14 @@ interface TopNavBarProps {
 
 export function TopNavBar({ pageName, onBack }: TopNavBarProps) {
   const [selectedYear, setSelectedYear] = useState(DEFAULT_ASSESSMENT_YEAR);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
   const showAssessmentYear = pageName === 'Inventory';
   const showBackButton = onBack && pageName !== 'Inventory';
+
+  const handleLicenseRevoke = () => {
+    // Reload the app to show registration page
+    window.location.reload();
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 backdrop-blur-md border-b border-amber-200/30">
@@ -25,7 +33,7 @@ export function TopNavBar({ pageName, onBack }: TopNavBarProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-3">
             {showBackButton && (
-              <button 
+              <button
                 onClick={onBack}
                 className="flex items-center space-x-1 text-amber-700 hover:text-amber-800 transition-colors"
               >
@@ -44,7 +52,7 @@ export function TopNavBar({ pageName, onBack }: TopNavBarProps) {
               </>
             )}
           </div>
-          
+
           {/* Centered page name */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
             {pageName && (
@@ -53,7 +61,7 @@ export function TopNavBar({ pageName, onBack }: TopNavBarProps) {
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center space-x-4">
             {showAssessmentYear && (
               <div className="flex items-center space-x-2">
@@ -72,10 +80,23 @@ export function TopNavBar({ pageName, onBack }: TopNavBarProps) {
                 </Select>
               </div>
             )}
+            <button
+              onClick={() => setShowLicenseModal(true)}
+              className="p-1.5 hover:bg-amber-100/50 rounded-lg transition-colors"
+              title="License Details"
+            >
+              <Key className="h-4 w-4 text-amber-700" />
+            </button>
             <OnlineStatus />
           </div>
         </div>
       </div>
+
+      <LicenseDetailsModal
+        isOpen={showLicenseModal}
+        onClose={() => setShowLicenseModal(false)}
+        onRevoke={handleLicenseRevoke}
+      />
     </nav>
   );
 }
