@@ -38,20 +38,20 @@ function App() {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  if (isActivated === null) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 flex items-center justify-center">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 border-4 border-amber-400/30 border-t-amber-500 rounded-full animate-spin"></div>
-          <span className="text-amber-700 font-medium">Loading TaxYatra...</span>
-        </div>
-      </div>
-    );
-  }
+  // if (isActivated === null) {
+  //   return (
+  //     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 flex items-center justify-center">
+  //       <div className="flex items-center space-x-3">
+  //         <div className="w-8 h-8 border-4 border-amber-400/30 border-t-amber-500 rounded-full animate-spin"></div>
+  //         <span className="text-amber-700 font-medium">Loading TaxYatra...</span>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
-  if (!isActivated) {
-    return <ActivationPage onActivate={handleActivation} />;
-  }
+  // if (!isActivated) {
+  //   return <ActivationPage onActivate={handleActivation} />;
+  // }
 
   // Route to different pages
   switch (currentPage) {
