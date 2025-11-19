@@ -3,34 +3,33 @@ import puppeteerService from '../services/puppeteer.service';
 import userDataService from '../services/userDataService';
 
 export function registerUserHandlers() {
-    ipcMain.handle('fetch-user-profile', async (_, pan: string, password: string) => {
+    ipcMain.handle('fetch-user-profile', async (event, pan: string, password: string) => {
         try {
-            const result = await puppeteerService.login(pan, password);
+            const sendProgress = (status: string) => {
+                event.sender.send('fetch-progress', status);
+            };
 
-            // If login successful, fetch and save full profile
+            const result = await puppeteerService.login(pan, password, sendProgress);
+
             if (result.success) {
                 try {
-                    await userDataService.fetchAndSaveUserProfile(pan, password, result.cookies);
-                } catch (saveError) {
-                    console.error('Error saving user profile after login:', saveError);
-                    // We still return success for login, but maybe warn?
+                    sendProgress('Fetching profile data...');
+                    const ITRApiService = (await import('../services/api')).default;
+                    const prefillData = await ITRApiService.fetchAllUserData(pan, password, result.cookies);
+                    sendProgress('✅ Profile data fetched successfully!');
+                    return { success: true, data: prefillData };
+                } catch (apiError) {
+                    sendProgress('❌ ' + apiError.message);
+                    return { success: false, message: apiError.message };
                 }
             }
 
             return result;
         } catch (error) {
-            console.error('Error fetching user profile:', error);
+            event.sender.send('fetch-progress', '❌ ' + error.message);
             return { success: false, message: error.message };
         }
     });
 
-    ipcMain.handle('get-user-data', async (_, pan: string) => {
-        try {
-            const userData = await userDataService.getUserData(pan);
-            return { success: true, data: userData };
-        } catch (error) {
-            console.error('Error getting user data:', error);
-            return { success: false, message: error.message };
-        }
-    });
+
 }

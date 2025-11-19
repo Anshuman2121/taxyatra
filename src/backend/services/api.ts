@@ -17,55 +17,7 @@ interface LoginResponse {
   passValdtnFlg?: string;
 }
 
-interface UserProfileResponse {
-  userId: string;
-  priMobileNum: string;
-  priEmailId: string;
-  addrLine1Txt: string;
-  addrLine2Txt: string;
-  addrLine3Txt: string;
-  addrLine4Txt: string;
-  pinCd: number;
-  stateCd: string;
-  aadhaarNum: string;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: number;
-  dob: string;
-  userGender: string;
-}
 
-interface BankAccount {
-  bankAcctNum: string;
-  ifscCd: string;
-  bankName: string;
-  bankBrnchTxt: string;
-  nameAsPerBank: string;
-  accountType: string;
-  status: string;
-  submitDt?: number;
-  validDt?: number;
-  refundFlag?: string;
-  accountStatus?: string;
-}
-
-interface BankDetailsResponse {
-  activeBank: BankAccount[];
-  inActiveBank: BankAccount[];
-  failedBank: BankAccount[];
-}
-
-interface JurisdictionResponse {
-  areaCd: string;
-  areaDesc: string;
-  aoType: string;
-  rangeCd: string;
-  aoNo: string;
-  aoPplrName: string;
-  aoEmailId: string;
-  aoBldgId: string;
-  aoBldgDesc: string;
-}
 
 class ITRApiService {
   private axiosInstance: AxiosInstance;
@@ -201,80 +153,7 @@ class ITRApiService {
     }
   }
 
-  async getUserProfile(userId: string): Promise<UserProfileResponse> {
-    try {
-      const response = await this.axiosInstance.post(`${BASE_URL}/servicesapi/auth/saveEntity`, {
-        serviceName: 'userProfileService',
-        userId: userId
-      }, {
-        headers: {
-          'sn': 'userProfileService'
-        }
-      });
 
-      const data = Array.isArray(response.data) ? response.data[0] : response.data;
-      return data;
-    } catch (error) {
-      throw new Error(`Failed to fetch user profile: ${error.message}`);
-    }
-  }
-
-  async getBankDetails(entityNum: string): Promise<BankDetailsResponse> {
-    try {
-      const response = await this.axiosInstance.post(`${BASE_URL}/servicesapi/auth/getEntity`, {
-        entityNum: entityNum,
-        serviceName: 'myBankAccountService',
-        header: { formName: 'FO-054-PBACC' }
-      }, {
-        headers: {
-          'sn': 'myBankAccountService'
-        }
-      });
-
-      const data = Array.isArray(response.data) ? response.data[0] : response.data;
-      return data;
-    } catch (error) {
-      throw new Error(`Failed to fetch bank details: ${error.message}`);
-    }
-  }
-
-  async getJurisdictionDetails(userId: string): Promise<JurisdictionResponse> {
-    try {
-      const response = await this.axiosInstance.post(`${BASE_URL}/servicesapi/auth/saveEntity`, {
-        serviceName: 'jurisdictionDetailsService',
-        loggedInUserId: userId
-      }, {
-        headers: {
-          'sn': 'jurisdictionDetailsService'
-        }
-      });
-
-      const data = Array.isArray(response.data) ? response.data[0] : response.data;
-      return data;
-    } catch (error) {
-      throw new Error(`Failed to fetch jurisdiction details: ${error.message}`);
-    }
-  }
-
-  async getITRDetails(): Promise<any> {
-    try {
-      const response = await this.axiosInstance.post(`${BASE_URL}/master/getDetails/`, {
-        tokenName: 'assment_year',
-        requiredColumns: ['assment_year_cd', 'assment_year_desc', 'itr_mode'],
-        dependentField: { itr_flag: 'Y' },
-        orderBy: [['assment_year_cd', 'desc']]
-      }, {
-        headers: {
-          'sn': 'assment_year'
-        }
-      });
-
-      const data = Array.isArray(response.data) ? response.data[0] : response.data;
-      return data;
-    } catch (error) {
-      throw new Error(`Failed to fetch ITR details: ${error.message}`);
-    }
-  }
 
   async setCookies(cookies: any[]) {
     for (const cookie of cookies) {
@@ -286,6 +165,28 @@ class ITRApiService {
     this.sessionInitialized = true;
   }
 
+  async getPrefillData(pan: string, assessmentYear: string = '2025'): Promise<any> {
+    try {
+      const response = await this.axiosInstance.post(
+        'https://eportal.incometax.gov.in/iec/itrweb/auth/v0.1/returns/getPrefillCurrentYr',
+        { pan, assessmentYear },
+        {
+          headers: {
+            'sn': 'NA',
+            'sec-ch-ua': '"Brave";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"'
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Prefill API Error:', error.response?.data || error.message);
+      throw new Error(`Failed to fetch prefill data: ${error.message}`);
+    }
+  }
+
   async fetchAllUserData(username: string, password: string, cookies?: any[]) {
     try {
       let loginData: LoginResponse;
@@ -293,17 +194,15 @@ class ITRApiService {
       if (cookies && cookies.length > 0) {
         console.log('Using provided cookies for session...');
         await this.setCookies(cookies);
-        // Construct minimal login data since we skipped actual login API
         loginData = {
           reqId: '',
           entity: username,
           entityType: 'PAN',
-          role: '', // Unknown without login response
-          userType: '', // Unknown without login response
-          fullName: '', // Will be populated from profile
+          role: '',
+          userType: '',
+          fullName: '',
         };
       } else {
-        // Login first
         loginData = await this.login(username, password);
       }
 
@@ -311,42 +210,10 @@ class ITRApiService {
         throw new Error('Login failed: No valid entity found');
       }
 
-      // For now, let's try to fetch data even if authentication might be partial
-      // This will help us understand what's working and what's not
-      console.log('Attempting to fetch user data with entity:', loginData.entity);
-
-      try {
-        // Fetch all user data
-        const [userProfile, bankDetails, jurisdictionDetails, itrDetails] = await Promise.all([
-          this.getUserProfile(loginData.entity),
-          this.getBankDetails(loginData.entity),
-          this.getJurisdictionDetails(loginData.entity),
-          this.getITRDetails()
-        ]);
-
-        // Enrich login data with profile info if missing
-        if (!loginData.fullName && userProfile) {
-          loginData.fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
-        }
-
-        return {
-          login: loginData,
-          profile: userProfile,
-          bankDetails,
-          jurisdiction: jurisdictionDetails,
-          itrDetails
-        };
-      } catch (dataError) {
-        console.error('Error fetching additional data:', dataError.message);
-        // Return just the login data if other calls fail
-        return {
-          login: loginData,
-          profile: null,
-          bankDetails: null,
-          jurisdiction: null,
-          itrDetails: null
-        };
-      }
+      console.log('Fetching prefill data for PAN:', loginData.entity);
+      const prefillData = await this.getPrefillData(loginData.entity);
+      
+      return prefillData;
     } catch (error) {
       throw new Error(`Failed to fetch user data: ${error.message}`);
     }

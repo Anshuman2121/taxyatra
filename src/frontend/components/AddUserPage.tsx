@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { TopNavBar } from './TopNavBar';
 import { BottomBar } from './BottomBar';
+import { PrefillDataDisplay } from './PrefillDataDisplay';
+import { FetchProgressModal } from './FetchProgressModal';
 
 interface AddUserPageProps {
   onBack: () => void;
@@ -16,6 +18,10 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [progressStatus, setProgressStatus] = useState('Starting browser...');
+  const [isComplete, setIsComplete] = useState(false);
+  const [isError, setIsError] = useState(false);
   const [manualData, setManualData] = useState({
     prefix: 'Mr.', firstName: '', middleName: '', lastName: '',
     status: 'Individual', residence: 'Resident', panNumber: '', employeeType: '', fileNo: '',
@@ -99,14 +105,48 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
 
     setIsLoading(true);
     setUserData(null);
+    setShowProgressModal(true);
+    setIsComplete(false);
+    setIsError(false);
+    setProgressStatus('Initializing...');
+
+    const progressListener = (_: any, status: string) => {
+      setProgressStatus(status);
+    };
+
+    window.electronAPI.onFetchProgress(progressListener);
+
     try {
       const result = await api.fetchUserProfile(pan, password);
-      setUserData(result);
+      
+      if (result.success && result.data) {
+        setUserData(result.data);
+        setIsComplete(true);
+      } else {
+        setUserData({ error: result.message || 'Failed to fetch data' });
+        setIsError(true);
+      }
     } catch (error) {
       setUserData({ error: error.message });
+      setIsError(true);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCloseModal = () => {
+    setShowProgressModal(false);
+    setProgressStatus('Initializing...');
+    setIsComplete(false);
+    setIsError(false);
+  };
+
+  const handleCancelFetch = () => {
+    setShowProgressModal(false);
+    setProgressStatus('Initializing...');
+    setIsComplete(false);
+    setIsError(false);
+    setIsLoading(false);
   };
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 relative overflow-hidden">
@@ -170,14 +210,7 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
                 </div>
 
                 {/* Display API response */}
-                {userData && (
-                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-left max-h-96 overflow-auto">
-                    <h3 className="text-sm font-semibold text-blue-800 mb-2">API Response</h3>
-                    <pre className="text-xs text-blue-700 whitespace-pre-wrap">
-                      {JSON.stringify(userData, null, 2)}
-                    </pre>
-                  </div>
-                )}
+                {userData && <PrefillDataDisplay data={userData} />}
 
                 <div className="mt-6 p-3 bg-slate-50 border border-yellow-200 rounded-lg">
                   <p className="text-xs text-yellow-800">
@@ -547,6 +580,15 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
       </div>
 
       <BottomBar />
+      
+      <FetchProgressModal
+        isOpen={showProgressModal}
+        onClose={handleCloseModal}
+        onCancel={handleCancelFetch}
+        status={progressStatus}
+        isComplete={isComplete}
+        isError={isError}
+      />
     </div>
   );
 }

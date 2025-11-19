@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPanCredentials: () => ipcRenderer.invoke('get-pan-credentials'),
   getPanWithPassword: (pan: string) => ipcRenderer.invoke('get-pan-with-password', pan),
   fetchUserProfile: (pan: string, password: string) => ipcRenderer.invoke('fetch-user-profile', pan, password),
-  getUserData: (pan: string) => ipcRenderer.invoke('get-user-data', pan)
+  getUserData: (pan: string) => ipcRenderer.invoke('get-user-data', pan),
+  onFetchProgress: (callback: (event: any, status: string) => void) => ipcRenderer.on('fetch-progress', callback)
 });
