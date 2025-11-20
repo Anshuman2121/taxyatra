@@ -37,3 +37,11 @@ npm run make
 ```bash
 npx create-electron-app@latest taxyatra --template=vite-typescript && cd taxyatra && npm install react react-dom @types/react @types/react-dom && npm install -D tailwindcss postcss autoprefixer @vitejs/plugin-react && npm install class-variance-authority clsx tailwind-merge lucide-react
 ```
+
+
+### To build
+
+npm run dist:win
+npm run dist:mac
+
+npm run dist:all

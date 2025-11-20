@@ -1,24 +1,33 @@
 import { Pool, PoolClient } from 'pg';
 import { app } from 'electron';
-import { dbConfig } from '../config/database.config';
+import { dbConfig, useLocalPostgres, postgresConfig } from '../config/database.config';
 
 let pool: Pool;
 
 export function initDatabase(): Promise<Pool> {
   return new Promise(async (resolve, reject) => {
     try {
-      console.log('Initializing PostgreSQL connection with config:', { ...dbConfig, password: '****' });
-      pool = new Pool(dbConfig);
+      if (useLocalPostgres) {
+        // Create database if it doesn't exist
+        await createDatabaseIfNotExists();
+        
+        console.log('Initializing PostgreSQL connection with config:', { ...dbConfig, password: '****' });
+        pool = new Pool(dbConfig);
 
-      // Test connection
-      const client = await pool.connect();
-      console.log('Successfully connected to PostgreSQL');
-      client.release();
+        // Test connection
+        const client = await pool.connect();
+        console.log('Successfully connected to PostgreSQL');
+        client.release();
 
-      await createTables();
+        await createTables();
+      } else {
+        console.log('Using SQLite database');
+        // SQLite initialization would go here
+      }
+      
       resolve(pool);
     } catch (err) {
-      console.error('Failed to connect to PostgreSQL:', err);
+      console.error('Failed to initialize database:', err);
       reject(err);
     }
   });
@@ -35,6 +44,32 @@ export function closeDatabase(): void {
     }).catch(err => {
       console.error('Error closing database pool:', err);
     });
+  }
+}
+
+async function createDatabaseIfNotExists(): Promise<void> {
+  const tempPool = new Pool({
+    ...postgresConfig,
+    database: 'postgres', // Connect to default postgres database
+  });
+
+  try {
+    const client = await tempPool.connect();
+    const result = await client.query(
+      `SELECT 1 FROM pg_database WHERE datname = $1`,
+      [postgresConfig.database]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query(`CREATE DATABASE ${postgresConfig.database}`);
+      console.log(`Database '${postgresConfig.database}' created successfully`);
+    }
+
+    client.release();
+  } catch (err) {
+    console.error('Error creating database:', err);
+  } finally {
+    await tempPool.end();
   }
 }
 

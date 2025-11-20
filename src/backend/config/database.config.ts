@@ -1,11 +1,19 @@
-import dotenv from 'dotenv';
+import path from 'path';
+import { app } from 'electron';
 
-dotenv.config();
+// Set to true to use local PostgreSQL, false to use embedded SQLite
+export const useLocalPostgres = false;
 
-export const dbConfig = {
-    user: process.env.DB_USER || 'admin',
-    host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_NAME || 'taxyatra',
-    password: process.env.DB_PASSWORD || 'admin',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
+export const sqliteConfig = {
+    filename: path.join(app.getPath('userData'), 'taxyatra.sqlite'),
 };
+
+export const postgresConfig = {
+    user: 'admin',
+    host: 'localhost',
+    database: 'taxyatra',
+    password: 'admin',
+    port: 5432,
+};
+
+export const dbConfig = useLocalPostgres ? postgresConfig : sqliteConfig;

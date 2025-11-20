@@ -34,6 +34,13 @@ const createWindow = () => {
     // Open the DevTools only in development.
     if (process.env.NODE_ENV === 'development') {
         mainWindow.webContents.openDevTools();
+        
+        // Suppress autofill console errors
+        mainWindow.webContents.on('console-message', (event, level, message) => {
+            if (message.includes('Autofill.enable') || message.includes('Autofill.setAddresses')) {
+                event.preventDefault();
+            }
+        });
     }
 };
 
