@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import puppeteerService from '../services/puppeteer.service';
 import userDataService from '../services/userDataService';
 import { ITRRepository } from '../database/repositories/itr.repository';
-import { getDatabase } from '../database/connection';
+import { getDatabase, isDatabaseOpen } from '../database/connection';
 
 export function registerUserHandlers() {
     ipcMain.handle('fetch-user-profile', async (event, pan: string, password: string) => {
@@ -57,8 +57,19 @@ export function registerUserHandlers() {
                             // Extract assessment year from prefill data or use default
                             const assessmentYear = prefillData.filingStatus?.assessmentYear || '2025';
 
+                            // Check database state before saving
+                            if (!isDatabaseOpen()) {
+                                console.error('❌ [User Controller] Database is closed or closing');
+                                return { success: false, message: 'Database is not available' };
+                            }
+
                             // Save to database using ITR repository
                             const db = getDatabase();
+                            if (!db) {
+                                console.error('❌ [User Controller] Database not initialized');
+                                return { success: false, message: 'Database not initialized' };
+                            }
+                            
                             const itrRepository = new ITRRepository(db);
                             const returnId = await itrRepository.savePrefillData(pan, assessmentYear, prefillData);
 
@@ -118,7 +129,17 @@ export function registerUserHandlers() {
     ipcMain.handle('get-user-data', async (event, pan: string) => {
         console.log('🔍 [User Controller] Fetching stored data for PAN:', pan);
         try {
+            if (!isDatabaseOpen()) {
+                console.log('⚠️  [User Controller] Database is closed or closing');
+                return { success: false, message: 'Database is not available' };
+            }
+            
             const db = getDatabase();
+            if (!db) {
+                console.error('❌ [User Controller] Database not initialized');
+                return { success: false, message: 'Database not initialized' };
+            }
+            
             const itrRepository = new ITRRepository(db);
             const userData = await itrRepository.getUserData(pan);
 

@@ -63,7 +63,8 @@ app.on('ready', async () => {
     }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+    console.log('🛑 [Main] App is quitting, closing database...');
     closeDatabase();
 });
 
@@ -71,7 +72,6 @@ app.on('before-quit', () => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-    closeDatabase();
     if (process.platform !== 'darwin') {
         app.quit();
     }

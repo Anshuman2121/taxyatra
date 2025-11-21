@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { dbConfig } from '../config/database.config';
 
-let db: Database.Database;
+let db: Database.Database | null = null;
+let isClosing = false;
 
 export function initDatabase(): Promise<Database.Database> {
   return new Promise(async (resolve, reject) => {
@@ -10,6 +11,7 @@ export function initDatabase(): Promise<Database.Database> {
       console.log('Initializing SQLite database at:', dbConfig.filename);
       
       db = new Database(dbConfig.filename, { verbose: console.log });
+      isClosing = false;
       
       // Enable WAL mode for better performance
       db.pragma('journal_mode = WAL');
@@ -26,17 +28,27 @@ export function initDatabase(): Promise<Database.Database> {
   });
 }
 
-export function getDatabase(): Database.Database {
+export function getDatabase(): Database.Database | null {
+  if (!db || isClosing) {
+    return null;
+  }
   return db;
 }
 
+export function isDatabaseOpen(): boolean {
+  return db !== null && !isClosing && db.open;
+}
+
 export function closeDatabase(): void {
-  if (db) {
+  if (db && !isClosing) {
     try {
+      isClosing = true;
       db.close();
+      db = null;
       console.log('Database closed successfully');
     } catch (err) {
       console.error('Error closing database:', err);
+      isClosing = false;
     }
   }
 }

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { isAppActivated, validateAndStoreActivationCode } from '../database/repositories/auth.repository';
-import { getDatabase } from '../database/connection';
+import { getDatabase, isDatabaseOpen } from '../database/connection';
 
 export function registerAuthHandlers() {
     ipcMain.handle('check-activation', async () => {
@@ -31,6 +31,11 @@ export function registerAuthHandlers() {
         console.log('💾 [Auth Controller] Saving PAN credentials...');
         console.log('🔑 PAN:', pan);
         try {
+            if (!isDatabaseOpen()) {
+                console.log('⚠️  [Auth Controller] Database is closed or closing');
+                return false;
+            }
+            
             const db = getDatabase();
             if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
@@ -56,6 +61,11 @@ export function registerAuthHandlers() {
     ipcMain.handle('get-pan-credentials', async () => {
         console.log('📊 [Auth Controller] Fetching all PAN credentials...');
         try {
+            if (!isDatabaseOpen()) {
+                console.log('⚠️  [Auth Controller] Database is closed or closing');
+                return [];
+            }
+            
             const db = getDatabase();
             if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
@@ -75,6 +85,11 @@ export function registerAuthHandlers() {
     ipcMain.handle('get-pan-with-password', async (_, pan: string) => {
         console.log('🔍 [Auth Controller] Fetching credentials for PAN:', pan);
         try {
+            if (!isDatabaseOpen()) {
+                console.log('⚠️  [Auth Controller] Database is closed or closing');
+                return null;
+            }
+            
             const db = getDatabase();
             if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
