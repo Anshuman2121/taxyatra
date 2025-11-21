@@ -10,8 +10,10 @@ export default defineConfig({
       external: [
         'electron',
         'better-sqlite3',
+        'bindings',
+        'file-uri-to-path',
         ...builtinModules,
-        ...builtinModules.map(m => `node:${m}`)
+        ...builtinModules.map((m: string) => `node:${m}`)
       ]
     }
   },
