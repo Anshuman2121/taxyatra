@@ -10,7 +10,7 @@ export function initDatabase(): Promise<Pool> {
       if (useLocalPostgres) {
         // Create database if it doesn't exist
         await createDatabaseIfNotExists();
-        
+
         console.log('Initializing PostgreSQL connection with config:', { ...dbConfig, password: '****' });
         pool = new Pool(dbConfig);
 
@@ -24,7 +24,7 @@ export function initDatabase(): Promise<Pool> {
         console.log('Using SQLite database');
         // SQLite initialization would go here
       }
-      
+
       resolve(pool);
     } catch (err) {
       console.error('Failed to initialize database:', err);
@@ -78,30 +78,7 @@ async function createTables(): Promise<void> {
   try {
     await client.query('BEGIN');
 
-    // Create registration table
-    await client.query(`
-            CREATE TABLE IF NOT EXISTS "registration" (
-                "id" SERIAL PRIMARY KEY,
-                "activation_code" TEXT NOT NULL,
-                "is_activated" BOOLEAN DEFAULT true,
-                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-    // Create inventory table
-    await client.query(`
-            CREATE TABLE IF NOT EXISTS "inventory" (
-                "id" SERIAL PRIMARY KEY,
-                "name" TEXT NOT NULL,
-                "status" TEXT NOT NULL,
-                "pan" TEXT NOT NULL,
-                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-    // Create pan_credentials table
+    // Create pan_credentials table (needed for authentication)
     await client.query(`
             CREATE TABLE IF NOT EXISTS "pan_credentials" (
                 "pan" TEXT PRIMARY KEY,
@@ -111,77 +88,160 @@ async function createTables(): Promise<void> {
             )
         `);
 
-    // Create users table
+    // ========== ITR TABLES ==========
+
+    // Create person table first (master table)
     await client.query(`
-            CREATE TABLE IF NOT EXISTS "users" (
-                "pan" TEXT PRIMARY KEY,
-                "firstName" TEXT,
-                "lastName" TEXT,
-                "fullName" TEXT,
-                "mobileNo" TEXT,
-                "email" TEXT,
-                "addrLine1Txt" TEXT,
-                "addrLine2Txt" TEXT,
-                "addrLine3Txt" TEXT,
-                "addrLine4Txt" TEXT,
-                "pinCd" INTEGER,
-                "stateCd" TEXT,
-                "aadhaarNum" TEXT,
-                "dateOfBirth" BIGINT,
-                "dob" TEXT,
-                "userGender" TEXT,
-                "userType" TEXT,
-                "role" TEXT,
-                "panStatus" TEXT,
-                "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            CREATE TABLE IF NOT EXISTS "person" (
+                "person_id" BIGSERIAL PRIMARY KEY,
+                "pan" VARCHAR(20) UNIQUE,
+                "person_type" VARCHAR(50),
+                "first_name" VARCHAR(200),
+                "middle_name" VARCHAR(200),
+                "last_name_or_org_name" VARCHAR(300),
+                "dob" DATE,
+                "date_of_incorp" DATE,
+                "aadhaar" VARCHAR(20),
+                "email" VARCHAR(255),
+                "mobile" VARCHAR(30),
+                "status_or_company_type" VARCHAR(100),
+                "sub_status" VARCHAR(100),
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-    // Create bank accounts table
+    // Create itr_return table - one record per person per assessment year
     await client.query(`
-            CREATE TABLE IF NOT EXISTS "bank_accounts" (
-                "id" SERIAL PRIMARY KEY,
-                "pan" TEXT,
-                "bankAcctNum" TEXT,
-                "ifscCd" TEXT,
-                "bankName" TEXT,
-                "bankBrnchTxt" TEXT,
-                "nameAsPerBank" TEXT,
-                "accountType" TEXT,
-                "status" TEXT,
-                "submitDt" BIGINT,
-                "validDt" BIGINT,
-                "refundFlag" TEXT,
-                "accountStatus" TEXT,
-                "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY ("pan") REFERENCES "users" ("pan")
+            CREATE TABLE IF NOT EXISTS "itr_return" (
+                "return_id" BIGSERIAL PRIMARY KEY,
+                "person_id" BIGINT NOT NULL,
+                "pan" VARCHAR(20),
+                "itr_type" VARCHAR(10),
+                "assessment_year" VARCHAR(9),
+                "filing_section" VARCHAR(50),
+                "orig_return_date" DATE,
+                "receipt_no" VARCHAR(100),
+                "notice_section" VARCHAR(50),
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("person_id") REFERENCES "person"("person_id") ON DELETE CASCADE,
+                UNIQUE("person_id", "assessment_year")
             )
         `);
 
-    // Create jurisdiction table
+    // Create address table
     await client.query(`
-            CREATE TABLE IF NOT EXISTS "jurisdiction" (
-                "pan" TEXT PRIMARY KEY,
-                "areaCd" TEXT,
-                "areaDesc" TEXT,
-                "aoType" TEXT,
-                "rangeCd" TEXT,
-                "aoNo" TEXT,
-                "aoPplrName" TEXT,
-                "aoEmailId" TEXT,
-                "aoBldgId" TEXT,
-                "aoBldgDesc" TEXT,
-                "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY ("pan") REFERENCES "users" ("pan")
+            CREATE TABLE IF NOT EXISTS "address" (
+                "address_id" BIGSERIAL PRIMARY KEY,
+                "person_id" BIGINT,
+                "address_type" VARCHAR(50),
+                "residence_no" VARCHAR(200),
+                "residence_name" VARCHAR(200),
+                "street" VARCHAR(300),
+                "locality" VARCHAR(255),
+                "city" VARCHAR(150),
+                "state_code" VARCHAR(20),
+                "country_code" VARCHAR(10),
+                "pin_code" VARCHAR(20),
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("person_id") REFERENCES "person"("person_id") ON DELETE CASCADE
+            )
+        `);
+
+    // Create bank_account table for ITR (separate from existing bank_accounts)
+    await client.query(`
+            CREATE TABLE IF NOT EXISTS "bank_account" (
+                "bank_account_id" BIGSERIAL PRIMARY KEY,
+                "person_id" BIGINT,
+                "ifsc" VARCHAR(20),
+                "bank_name" VARCHAR(255),
+                "account_number" VARCHAR(50),
+                "account_type" VARCHAR(50),
+                "use_for_refund" BOOLEAN DEFAULT FALSE,
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("person_id") REFERENCES "person"("person_id") ON DELETE CASCADE
+            )
+        `);
+
+    // Create salary_income table
+    await client.query(`
+            CREATE TABLE IF NOT EXISTS "salary_income" (
+                "salary_id" BIGSERIAL PRIMARY KEY,
+                "return_id" BIGINT,
+                "person_id" BIGINT,
+                "employer_name" VARCHAR(255),
+                "employer_tan" VARCHAR(50),
+                "nature_of_employment" VARCHAR(100),
+                "gross_salary" DECIMAL(18,2),
+                "salary" DECIMAL(18,2),
+                "perquisites_value" DECIMAL(18,2),
+                "profits_in_lieu" DECIMAL(18,2),
+                "standard_deduction" DECIMAL(18,2),
+                "professional_tax" DECIMAL(18,2),
+                "net_salary" DECIMAL(18,2),
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("return_id") REFERENCES "itr_return"("return_id") ON DELETE CASCADE,
+                FOREIGN KEY("person_id") REFERENCES "person"("person_id") ON DELETE SET NULL
+            )
+        `);
+
+    // Create other_income table
+    await client.query(`
+            CREATE TABLE IF NOT EXISTS "other_income" (
+                "other_id" BIGSERIAL PRIMARY KEY,
+                "return_id" BIGINT,
+                "person_id" BIGINT,
+                "nature_desc" VARCHAR(400),
+                "amount" DECIMAL(18,2),
+                "is_notified_89a" BOOLEAN,
+                "notified_country" VARCHAR(10),
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("return_id") REFERENCES "itr_return"("return_id") ON DELETE CASCADE,
+                FOREIGN KEY("person_id") REFERENCES "person"("person_id") ON DELETE SET NULL
+            )
+        `);
+
+    // Create tds_salary table
+    await client.query(`
+            CREATE TABLE IF NOT EXISTS "tds_salary" (
+                "tds_sal_id" BIGSERIAL PRIMARY KEY,
+                "return_id" BIGINT,
+                "employer_name" VARCHAR(255),
+                "tan" VARCHAR(50),
+                "income_chargeable" DECIMAL(18,2),
+                "tds_deducted" DECIMAL(18,2),
+                "tds_claimed" DECIMAL(18,2),
+                "financial_year" VARCHAR(9),
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("return_id") REFERENCES "itr_return"("return_id") ON DELETE CASCADE
+            )
+        `);
+
+    // Create deductions_master table
+    await client.query(`
+            CREATE TABLE IF NOT EXISTS "deductions_master" (
+                "deduction_id" BIGSERIAL PRIMARY KEY,
+                "return_id" BIGINT,
+                "section_code" VARCHAR(50),
+                "amount" DECIMAL(18,2),
+                "details" JSON,
+                "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY("return_id") REFERENCES "itr_return"("return_id") ON DELETE CASCADE
             )
         `);
 
     await client.query('COMMIT');
+    console.log('All tables created successfully');
   } catch (e) {
     await client.query('ROLLBACK');
+    console.error('Error creating tables:', e);
     throw e;
   } finally {
     client.release();

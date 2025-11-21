@@ -37,8 +37,14 @@ class ITRApiService {
     }));
 
     // Log all requests and responses
-    this.axiosInstance.interceptors.request.use(config => {
+    this.axiosInstance.interceptors.request.use(async config => {
       console.log('Request:', config.method?.toUpperCase(), config.url);
+
+      if (config.url) {
+        const cookies = await this.cookieJar.getCookieString(config.url);
+        console.log('🍪 [API Service] Outgoing Cookies:', cookies);
+      }
+
       return config;
     });
 
@@ -156,13 +162,52 @@ class ITRApiService {
 
 
   async setCookies(cookies: any[]) {
+    console.log('🔧 [API Service] Setting', cookies.length, 'cookies with full attributes...');
+    console.log('📋 [API Service] Raw cookies received:', JSON.stringify(cookies, null, 2));
+
     for (const cookie of cookies) {
-      await this.cookieJar.setCookie(
-        `${cookie.name}=${cookie.value}; domain=${cookie.domain}; path=${cookie.path}`,
-        `https://${cookie.domain}${cookie.path}`
-      );
+      try {
+        // Construct cookie string with all available attributes
+        let cookieString = `${cookie.name}=${cookie.value}`;
+        if (cookie.domain) cookieString += `; domain=${cookie.domain}`;
+        if (cookie.path) cookieString += `; path=${cookie.path}`;
+        if (cookie.secure) cookieString += '; Secure';
+        if (cookie.httpOnly) cookieString += '; HttpOnly';
+        if (cookie.expires && cookie.expires !== -1) {
+          const expiresDate = new Date(cookie.expires * 1000);
+          cookieString += `; expires=${expiresDate.toUTCString()}`;
+        }
+        if (cookie.sameSite) cookieString += `; SameSite=${cookie.sameSite}`;
+
+        const url = `https://${cookie.domain?.startsWith('.') ? 'www' + cookie.domain : cookie.domain}${cookie.path}`;
+
+        console.log(`  → Setting: ${cookie.name}`);
+        console.log(`    String: ${cookieString}`);
+        console.log(`    URL: ${url}`);
+
+        await this.cookieJar.setCookie(cookieString, url);
+        console.log(`    ✅ Set successfully`);
+
+        // Special handling for AuthToken: Force set it for eportal.incometax.gov.in as well
+        // This handles cases where tough-cookie domain matching is strict or flaky with leading dots
+        if (cookie.name === 'AuthToken' && cookie.domain === '.incometax.gov.in') {
+          console.log('    🔄 Duplicating AuthToken for eportal.incometax.gov.in...');
+          const eportalCookieString = cookieString.replace('domain=.incometax.gov.in', 'domain=eportal.incometax.gov.in');
+          const eportalUrl = 'https://eportal.incometax.gov.in/';
+          await this.cookieJar.setCookie(eportalCookieString, eportalUrl);
+          console.log(`    ✅ Duplicate set successfully`);
+        }
+      } catch (error) {
+        console.error(`    ❌ Failed to set cookie ${cookie.name}:`, error.message);
+      }
     }
     this.sessionInitialized = true;
+    console.log('✅ [API Service] All cookies processed');
+
+    // Verify cookies were set
+    const setCookies = await this.cookieJar.getCookies('https://eportal.incometax.gov.in');
+    console.log('🔍 [API Service] Cookies now in jar:', setCookies.length);
+    console.log('📋 [API Service] Cookie names in jar:', setCookies.map(c => c.key).join(', '));
   }
 
   async getPrefillData(pan: string, assessmentYear: string = '2025'): Promise<any> {
@@ -187,34 +232,76 @@ class ITRApiService {
     }
   }
 
-  async fetchAllUserData(username: string, password: string, cookies?: any[]) {
+  async fetchAllUserData(pan: string, password: string, cookies: any[]): Promise<any> {
+    console.log('\n========================================');
+    console.log('📊 [API Service] Starting fetchAllUserData');
+    console.log('🔑 PAN:', pan);
+    console.log('🍪 Cookies received:', cookies.length);
+    console.log('========================================\n');
+
     try {
-      let loginData: LoginResponse;
+      await this.initializeSession();
+      console.log('✅ [API Service] Session initialized');
 
-      if (cookies && cookies.length > 0) {
-        console.log('Using provided cookies for session...');
-        await this.setCookies(cookies);
-        loginData = {
-          reqId: '',
-          entity: username,
-          entityType: 'PAN',
-          role: '',
-          userType: '',
-          fullName: '',
-        };
+      // Set cookies using the proper method that preserves all attributes
+      console.log('🍪 [API Service] Setting cookies in cookie jar...');
+      await this.setCookies(cookies);
+      console.log('✅ [API Service] Cookies set successfully');
+
+      // Fetch prefill data - this contains all the data we need
+      console.log('📊 [API Service] Fetching prefill data from income tax portal...');
+      const prefillResponse = await this.getPrefillData(pan);
+      console.log('✅ [API Service] Prefill data fetched successfully');
+      console.log('📋 [API Service] Response structure:', JSON.stringify(Object.keys(prefillResponse), null, 2));
+
+      // Parse the content field if it's a string (the API returns stringified JSON in the content field)
+      let prefillData;
+      if (prefillResponse.content && typeof prefillResponse.content === 'string') {
+        console.log('🔄 [API Service] Parsing stringified content field...');
+        try {
+          prefillData = JSON.parse(prefillResponse.content);
+          console.log('✅ [API Service] Content parsed successfully');
+        } catch (parseError) {
+          console.error('❌ [API Service] Failed to parse content field:', parseError);
+          throw new Error('Failed to parse API response content');
+        }
+      } else if (prefillResponse.content && typeof prefillResponse.content === 'object') {
+        // Content is already an object
+        prefillData = prefillResponse.content;
       } else {
-        loginData = await this.login(username, password);
+        // Fallback: assume the response itself is the data
+        prefillData = prefillResponse;
       }
 
-      if (!loginData || !loginData.entity) {
-        throw new Error('Login failed: No valid entity found');
-      }
+      console.log('📋 [API Service] Prefill data structure:', JSON.stringify(Object.keys(prefillData), null, 2));
 
-      console.log('Fetching prefill data for PAN:', loginData.entity);
-      const prefillData = await this.getPrefillData(loginData.entity);
-      
-      return prefillData;
+      // Extract individual components from the prefill data
+      // The data is at the root level of the parsed content
+      const personalInfo = prefillData.personalInfo || {};
+      const bankAccountDtls = prefillData.bankAccountDtls || [];
+      const form26as = prefillData.form26as || {};
+      const form24q = prefillData.form24q || {};
+      const filingStatus = prefillData.filingStatus || {};
+      const insights = prefillData.insights || {};
+
+      console.log('👤 [API Service] Personal info extracted:', personalInfo?.assesseeName?.firstName, personalInfo?.assesseeName?.surNameOrOrgName);
+      console.log('🏦 [API Service] Bank accounts extracted:', bankAccountDtls?.length || 0, 'accounts');
+      console.log('📄 [API Service] Form 26AS extracted:', form26as ? 'Yes' : 'No');
+      console.log('📄 [API Service] Form 24Q extracted:', form24q ? 'Yes' : 'No');
+      console.log('📊 [API Service] Filing status extracted:', filingStatus ? 'Yes' : 'No');
+      console.log('💡 [API Service] Insights extracted:', insights ? 'Yes' : 'No');
+
+      return {
+        personalInfo,
+        bankAccountDtls,
+        form26as,
+        form24q,
+        filingStatus,
+        insights
+      };
     } catch (error) {
+      console.error('❌ [API Service] Failed to fetch user data:', error.message);
+      console.error('❌ [API Service] Error stack:', error.stack);
       throw new Error(`Failed to fetch user data: ${error.message}`);
     }
   }
