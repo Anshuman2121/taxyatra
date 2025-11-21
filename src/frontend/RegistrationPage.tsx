@@ -76,6 +76,9 @@ export default function RegistrationPage({ onRegistered }: RegistrationPageProps
                     {/* Right side - Activation form */}
                     <div className="w-full bg-white/70 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden border border-amber-300/40">
                         <div className="p-6 text-center border-b border-amber-200/30">
+                            <div className="flex justify-center mb-4">
+                                <img src="icon.png" alt="TaxYatra Logo" className="w-20 h-20 object-contain" />
+                            </div>
                             <h2 className="text-3xl font-bold text-amber-900 mb-2" style={{fontFamily: 'Georgia, serif'}}>Activate Your License</h2>
                             <p className="text-amber-700/80 italic" style={{fontFamily: 'Georgia, serif'}}>
                                 Enter your license key to get started

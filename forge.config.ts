@@ -11,6 +11,8 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: false,
+    icon: './build/icon',
+    name: 'TaxYatra',
   },
   rebuildConfig: {},
   makers: [

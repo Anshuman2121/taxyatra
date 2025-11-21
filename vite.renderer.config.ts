@@ -5,6 +5,7 @@ export default defineConfig(async () => {
   const react = await import('@vitejs/plugin-react');
   return {
     plugins: [react.default()],
+    publicDir: 'assets',
     build: {
       minify: process.env.NODE_ENV === 'production',
       sourcemap: process.env.NODE_ENV === 'development',
