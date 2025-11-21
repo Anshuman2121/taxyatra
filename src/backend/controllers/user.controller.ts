@@ -58,8 +58,8 @@ export function registerUserHandlers() {
                             const assessmentYear = prefillData.filingStatus?.assessmentYear || '2025';
 
                             // Save to database using ITR repository
-                            const pool = getDatabase();
-                            const itrRepository = new ITRRepository(pool);
+                            const db = getDatabase();
+                            const itrRepository = new ITRRepository(db);
                             const returnId = await itrRepository.savePrefillData(pan, assessmentYear, prefillData);
 
                             sendProgress('✅ Profile data saved successfully!');
@@ -118,8 +118,8 @@ export function registerUserHandlers() {
     ipcMain.handle('get-user-data', async (event, pan: string) => {
         console.log('🔍 [User Controller] Fetching stored data for PAN:', pan);
         try {
-            const pool = getDatabase();
-            const itrRepository = new ITRRepository(pool);
+            const db = getDatabase();
+            const itrRepository = new ITRRepository(db);
             const userData = await itrRepository.getUserData(pan);
 
             if (userData) {

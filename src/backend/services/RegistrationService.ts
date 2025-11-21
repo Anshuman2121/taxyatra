@@ -1,7 +1,6 @@
 import Store from 'electron-store';
 import { machineId } from 'node-machine-id';
 import axios from 'axios';
-import { app } from 'electron';
 
 // Configuration
 const API_URL = 'https://taxyatra-registration.anshumanabhishek2.workers.dev';
@@ -18,18 +17,30 @@ interface RegistrationStore {
     signature: string; // Simple integrity check
 }
 
-const store = new Store<RegistrationStore>({
-    name: 'taxyatra-license',
-    encryptionKey: 'taxyatra-secure-storage-key', // Simple encryption
-    defaults: {
-        licenseKey: '',
-        machineId: '',
-        expiryDate: '',
-        customerName: '',
-        activatedAt: '',
-        signature: ''
+let store: Store<RegistrationStore> | null = null;
+
+function getStore(): Store<RegistrationStore> {
+    if (!store) {
+        try {
+            store = new Store<RegistrationStore>({
+                name: 'taxyatra-license',
+                encryptionKey: 'taxyatra-secure-storage-key', // Simple encryption
+                defaults: {
+                    licenseKey: '',
+                    machineId: '',
+                    expiryDate: '',
+                    customerName: '',
+                    activatedAt: '',
+                    signature: ''
+                }
+            });
+        } catch (error) {
+            console.error('❌ [RegistrationService] Failed to initialize store:', error);
+            throw error;
+        }
     }
-});
+    return store;
+}
 
 class RegistrationService {
     async getMachineId(): Promise<string> {
@@ -37,9 +48,10 @@ class RegistrationService {
     }
 
     async checkRegistration(): Promise<{ registered: boolean; error?: string; expiryDate?: string }> {
-        const storedLicense = store.get('licenseKey');
-        const storedMachineId = store.get('machineId');
-        const storedExpiry = store.get('expiryDate');
+        const storeInstance = getStore();
+        const storedLicense = storeInstance.get('licenseKey');
+        const storedMachineId = storeInstance.get('machineId');
+        const storedExpiry = storeInstance.get('expiryDate');
 
         if (!storedLicense || !storedMachineId) {
             return { registered: false };
@@ -85,13 +97,14 @@ class RegistrationService {
 
             if (data.valid) {
                 // Store license details securely
-                store.set('licenseKey', licenseKey);
-                store.set('machineId', currentMachineId);
-                store.set('expiryDate', data.license.expiry_date);
-                store.set('customerName', data.license.customer_name || 'Unknown');
-                store.set('activatedAt', data.license.activation_date || new Date().toISOString());
+                const storeInstance = getStore();
+                storeInstance.set('licenseKey', licenseKey);
+                storeInstance.set('machineId', currentMachineId);
+                storeInstance.set('expiryDate', data.license.expiry_date);
+                storeInstance.set('customerName', data.license.customer_name || 'Unknown');
+                storeInstance.set('activatedAt', data.license.activation_date || new Date().toISOString());
                 // In a real app, we'd sign this data with a private key to prevent tampering
-                store.set('signature', 'valid');
+                storeInstance.set('signature', 'valid');
 
                 return { success: true };
             } else {
@@ -105,11 +118,12 @@ class RegistrationService {
     }
 
     async getLicenseDetails() {
-        const licenseKey = store.get('licenseKey');
-        const machineId = store.get('machineId');
-        const expiryDate = store.get('expiryDate');
-        const customerName = store.get('customerName');
-        const activatedAt = store.get('activatedAt');
+        const storeInstance = getStore();
+        const licenseKey = storeInstance.get('licenseKey');
+        const machineId = storeInstance.get('machineId');
+        const expiryDate = storeInstance.get('expiryDate');
+        const customerName = storeInstance.get('customerName');
+        const activatedAt = storeInstance.get('activatedAt');
 
         if (!licenseKey || !machineId) {
             return null;
@@ -130,7 +144,7 @@ class RegistrationService {
     }
 
     async clearRegistration() {
-        store.clear();
+        getStore().clear();
     }
 }
 

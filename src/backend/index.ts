@@ -49,11 +49,16 @@ const createWindow = () => {
 // Some APIs can only be used after this event occurs.
 app.on('ready', async () => {
     try {
+        console.log('🚀 [Main] App ready, initializing...');
         await initDatabase();
+        console.log('✅ [Main] Database initialized');
         registerIpcHandlers();
+        console.log('✅ [Main] IPC handlers registered');
         createWindow();
+        console.log('✅ [Main] Window created');
     } catch (error) {
-        console.error('Failed to initialize database:', error);
+        console.error('❌ [Main] Failed to initialize app:', error);
+        app.quit();
     }
 });
 

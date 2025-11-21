@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import Database from 'better-sqlite3';
 
 export interface User {
   pan: string; // Primary key
@@ -57,41 +57,41 @@ export interface Jurisdiction {
 }
 
 export class UserModel {
-  constructor(private pool: Pool) { }
+  constructor(private db: Database.Database) { }
 
   // createTables removed as it is handled in connection.ts
 
   async saveUser(userData: Partial<User>): Promise<void> {
-    const sql = `
+    const stmt = this.db.prepare(`
       INSERT INTO "users" (
         "pan", "firstName", "lastName", "fullName", "mobileNo", "email",
         "addrLine1Txt", "addrLine2Txt", "addrLine3Txt", "addrLine4Txt",
         "pinCd", "stateCd", "aadhaarNum", "dateOfBirth", "dob",
         "userGender", "userType", "role", "panStatus", "updatedAt"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT ("pan") DO UPDATE SET
-        "firstName" = EXCLUDED."firstName",
-        "lastName" = EXCLUDED."lastName",
-        "fullName" = EXCLUDED."fullName",
-        "mobileNo" = EXCLUDED."mobileNo",
-        "email" = EXCLUDED."email",
-        "addrLine1Txt" = EXCLUDED."addrLine1Txt",
-        "addrLine2Txt" = EXCLUDED."addrLine2Txt",
-        "addrLine3Txt" = EXCLUDED."addrLine3Txt",
-        "addrLine4Txt" = EXCLUDED."addrLine4Txt",
-        "pinCd" = EXCLUDED."pinCd",
-        "stateCd" = EXCLUDED."stateCd",
-        "aadhaarNum" = EXCLUDED."aadhaarNum",
-        "dateOfBirth" = EXCLUDED."dateOfBirth",
-        "dob" = EXCLUDED."dob",
-        "userGender" = EXCLUDED."userGender",
-        "userType" = EXCLUDED."userType",
-        "role" = EXCLUDED."role",
-        "panStatus" = EXCLUDED."panStatus",
+        "firstName" = excluded."firstName",
+        "lastName" = excluded."lastName",
+        "fullName" = excluded."fullName",
+        "mobileNo" = excluded."mobileNo",
+        "email" = excluded."email",
+        "addrLine1Txt" = excluded."addrLine1Txt",
+        "addrLine2Txt" = excluded."addrLine2Txt",
+        "addrLine3Txt" = excluded."addrLine3Txt",
+        "addrLine4Txt" = excluded."addrLine4Txt",
+        "pinCd" = excluded."pinCd",
+        "stateCd" = excluded."stateCd",
+        "aadhaarNum" = excluded."aadhaarNum",
+        "dateOfBirth" = excluded."dateOfBirth",
+        "dob" = excluded."dob",
+        "userGender" = excluded."userGender",
+        "userType" = excluded."userType",
+        "role" = excluded."role",
+        "panStatus" = excluded."panStatus",
         "updatedAt" = CURRENT_TIMESTAMP
-    `;
+    `);
 
-    await this.pool.query(sql, [
+    stmt.run(
       userData.pan,
       userData.firstName,
       userData.lastName,
@@ -111,28 +111,25 @@ export class UserModel {
       userData.userType,
       userData.role,
       userData.panStatus
-    ]);
+    );
   }
 
   async saveBankAccounts(pan: string, bankAccounts: Partial<BankAccount>[]): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-
+    const transaction = this.db.transaction(() => {
       // First delete existing bank accounts for this PAN
-      await client.query('DELETE FROM "bank_accounts" WHERE "pan" = $1', [pan]);
+      this.db.prepare('DELETE FROM "bank_accounts" WHERE "pan" = ?').run(pan);
 
       // Insert new bank accounts
-      const sql = `
+      const stmt = this.db.prepare(`
         INSERT INTO "bank_accounts" (
           "pan", "bankAcctNum", "ifscCd", "bankName", "bankBrnchTxt",
           "nameAsPerBank", "accountType", "status", "submitDt", "validDt",
           "refundFlag", "accountStatus"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      `;
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
       for (const account of bankAccounts) {
-        await client.query(sql, [
+        stmt.run(
           pan,
           account.bankAcctNum,
           account.ifscCd,
@@ -145,38 +142,33 @@ export class UserModel {
           account.validDt,
           account.refundFlag,
           account.accountStatus
-        ]);
+        );
       }
+    });
 
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
+    transaction();
   }
 
   async saveJurisdiction(jurisdictionData: Partial<Jurisdiction>): Promise<void> {
-    const sql = `
+    const stmt = this.db.prepare(`
       INSERT INTO "jurisdiction" (
         "pan", "areaCd", "areaDesc", "aoType", "rangeCd", "aoNo",
         "aoPplrName", "aoEmailId", "aoBldgId", "aoBldgDesc", "updatedAt"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT ("pan") DO UPDATE SET
-        "areaCd" = EXCLUDED."areaCd",
-        "areaDesc" = EXCLUDED."areaDesc",
-        "aoType" = EXCLUDED."aoType",
-        "rangeCd" = EXCLUDED."rangeCd",
-        "aoNo" = EXCLUDED."aoNo",
-        "aoPplrName" = EXCLUDED."aoPplrName",
-        "aoEmailId" = EXCLUDED."aoEmailId",
-        "aoBldgId" = EXCLUDED."aoBldgId",
-        "aoBldgDesc" = EXCLUDED."aoBldgDesc",
+        "areaCd" = excluded."areaCd",
+        "areaDesc" = excluded."areaDesc",
+        "aoType" = excluded."aoType",
+        "rangeCd" = excluded."rangeCd",
+        "aoNo" = excluded."aoNo",
+        "aoPplrName" = excluded."aoPplrName",
+        "aoEmailId" = excluded."aoEmailId",
+        "aoBldgId" = excluded."aoBldgId",
+        "aoBldgDesc" = excluded."aoBldgDesc",
         "updatedAt" = CURRENT_TIMESTAMP
-    `;
+    `);
 
-    await this.pool.query(sql, [
+    stmt.run(
       jurisdictionData.pan,
       jurisdictionData.areaCd,
       jurisdictionData.areaDesc,
@@ -187,21 +179,21 @@ export class UserModel {
       jurisdictionData.aoEmailId,
       jurisdictionData.aoBldgId,
       jurisdictionData.aoBldgDesc
-    ]);
+    );
   }
 
   async getUserByPan(pan: string): Promise<User | null> {
-    const res = await this.pool.query('SELECT * FROM "users" WHERE "pan" = $1', [pan]);
-    return res.rows[0] as User || null;
+    const stmt = this.db.prepare('SELECT * FROM "users" WHERE "pan" = ?');
+    return stmt.get(pan) as User || null;
   }
 
   async getBankAccountsByPan(pan: string): Promise<BankAccount[]> {
-    const res = await this.pool.query('SELECT * FROM "bank_accounts" WHERE "pan" = $1', [pan]);
-    return res.rows as BankAccount[];
+    const stmt = this.db.prepare('SELECT * FROM "bank_accounts" WHERE "pan" = ?');
+    return stmt.all(pan) as BankAccount[];
   }
 
   async getJurisdictionByPan(pan: string): Promise<Jurisdiction | null> {
-    const res = await this.pool.query('SELECT * FROM "jurisdiction" WHERE "pan" = $1', [pan]);
-    return res.rows[0] as Jurisdiction || null;
+    const stmt = this.db.prepare('SELECT * FROM "jurisdiction" WHERE "pan" = ?');
+    return stmt.get(pan) as Jurisdiction || null;
   }
 }

@@ -31,19 +31,20 @@ export function registerAuthHandlers() {
         console.log('💾 [Auth Controller] Saving PAN credentials...');
         console.log('🔑 PAN:', pan);
         try {
-            const pool = getDatabase();
-            if (!pool) {
+            const db = getDatabase();
+            if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
                 return false;
             }
 
-            await pool.query(`
+            const stmt = db.prepare(`
                 INSERT INTO "pan_credentials" ("pan", "password", "updated_at") 
-                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT ("pan") DO UPDATE SET 
-                "password" = EXCLUDED."password", 
+                "password" = excluded."password", 
                 "updated_at" = CURRENT_TIMESTAMP
-            `, [pan, password]);
+            `);
+            stmt.run(pan, password);
             console.log('✅ [Auth Controller] PAN credentials saved successfully');
             return true;
         } catch (error) {
@@ -55,15 +56,16 @@ export function registerAuthHandlers() {
     ipcMain.handle('get-pan-credentials', async () => {
         console.log('📊 [Auth Controller] Fetching all PAN credentials...');
         try {
-            const pool = getDatabase();
-            if (!pool) {
+            const db = getDatabase();
+            if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
                 return [];
             }
 
-            const res = await pool.query('SELECT "pan", "created_at" FROM "pan_credentials" ORDER BY "created_at" DESC');
-            console.log('✅ [Auth Controller] Found', res.rows.length, 'PAN credential(s)');
-            return res.rows;
+            const stmt = db.prepare('SELECT "pan", "created_at" FROM "pan_credentials" ORDER BY "created_at" DESC');
+            const rows = stmt.all();
+            console.log('✅ [Auth Controller] Found', rows.length, 'PAN credential(s)');
+            return rows;
         } catch (error) {
             console.error('❌ [Auth Controller] Error getting PAN credentials:', error);
             return [];
@@ -73,19 +75,20 @@ export function registerAuthHandlers() {
     ipcMain.handle('get-pan-with-password', async (_, pan: string) => {
         console.log('🔍 [Auth Controller] Fetching credentials for PAN:', pan);
         try {
-            const pool = getDatabase();
-            if (!pool) {
+            const db = getDatabase();
+            if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
                 return null;
             }
 
-            const res = await pool.query('SELECT "pan", "password" FROM "pan_credentials" WHERE "pan" = $1', [pan]);
-            if (res.rows[0]) {
+            const stmt = db.prepare('SELECT "pan", "password" FROM "pan_credentials" WHERE "pan" = ?');
+            const row = stmt.get(pan);
+            if (row) {
                 console.log('✅ [Auth Controller] Credentials found for PAN:', pan);
             } else {
                 console.log('⚠️  [Auth Controller] No credentials found for PAN:', pan);
             }
-            return res.rows[0] || null;
+            return row || null;
         } catch (error) {
             console.error('❌ [Auth Controller] Error getting PAN with password:', error);
             return null;
