@@ -9,6 +9,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePanCredentials: (pan: string, password: string) => ipcRenderer.invoke('save-pan-credentials', pan, password),
   getPanCredentials: () => ipcRenderer.invoke('get-pan-credentials'),
   getPanWithPassword: (pan: string) => ipcRenderer.invoke('get-pan-with-password', pan),
-  fetchUserProfile: (pan: string, password: string) => ipcRenderer.invoke('fetch-user-profile', pan, password),
-  getUserData: (pan: string) => ipcRenderer.invoke('get-user-data', pan)
+  fetchUserProfile: (pan: string, password: string, save?: boolean) => ipcRenderer.invoke('fetch-user-profile', pan, password, save),
+  saveFetchedProfile: (data: any) => ipcRenderer.invoke('save-fetched-profile', data),
+  getUserData: (pan: string) => ipcRenderer.invoke('get-user-data', pan),
+  getAllUsers: () => ipcRenderer.invoke('get-all-users'),
+  updateUserDetails: (data: any) => ipcRenderer.invoke('update-user-details', data),
+  onFetchProgress: (callback: (event: any, status: string) => void) => ipcRenderer.on('fetch-progress', callback),
+  // Registration API
+  checkRegistration: () => ipcRenderer.invoke('registration:check'),
+  submitRegistration: (licenseKey: string) => ipcRenderer.invoke('registration:submit', licenseKey),
+  getMachineId: () => ipcRenderer.invoke('registration:machine-id'),
+  getLicenseDetails: () => ipcRenderer.invoke('registration:details'),
+  revokeLicense: () => ipcRenderer.invoke('registration:revoke')
 });

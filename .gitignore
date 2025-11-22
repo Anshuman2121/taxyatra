@@ -5,7 +5,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
-
+dist
+dist_electron
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
@@ -90,3 +91,12 @@ typings/
 
 # Electron-Forge
 out/
+
+# Build artifacts
+output.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

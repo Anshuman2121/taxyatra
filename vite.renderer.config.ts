@@ -5,7 +5,12 @@ export default defineConfig(async () => {
   const react = await import('@vitejs/plugin-react');
   return {
     plugins: [react.default()],
+    base: './',
+    root: 'src/frontend',
+    publicDir: 'assets',
     build: {
+      outDir: '../../dist/renderer',
+      emptyOutDir: true,
       minify: process.env.NODE_ENV === 'production',
       sourcemap: process.env.NODE_ENV === 'development',
       rollupOptions: {
@@ -16,6 +21,10 @@ export default defineConfig(async () => {
           }
         }
       }
+    },
+    server: {
+      port: 5173,
+      strictPort: true
     },
     define: {
       __IS_DEV__: process.env.NODE_ENV === 'development'
