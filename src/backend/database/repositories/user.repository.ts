@@ -65,7 +65,7 @@ export class UserModel {
     // This method is kept for legacy support or manual updates if needed, 
     // but ideally we should use ITRRepository for saving profile data.
     // For now, we'll update it to save to 'person' and 'address' tables to maintain compatibility
-    // if this method is called directly (e.g. from manual entry in AddUserPage).
+    // if this method is called directly (e.g. from manual entry in UserProfilePage).
 
     const transaction = this.db.transaction(() => {
       // 1. Save/Update Person
@@ -301,5 +301,51 @@ export class UserModel {
       ...u,
       fullName: u.fullName ? u.fullName.replace(/\s+/g, ' ').trim() : ''
     })) as User[];
+  }
+
+  async deleteUser(pan: string): Promise<void> {
+    const transaction = this.db.transaction(() => {
+      // Get person_id first
+      const person = this.db.prepare('SELECT "person_id" FROM "person" WHERE "pan" = ?').get(pan) as any;
+
+      if (person) {
+        const personId = person.person_id;
+
+        // 1. Get all return_ids for this person
+        const returns = this.db.prepare('SELECT "return_id" FROM "itr_return" WHERE "person_id" = ?').all(personId) as any[];
+
+        // 2. Delete data linked to returns
+        for (const ret of returns) {
+          const returnId = ret.return_id;
+          this.db.prepare('DELETE FROM "salary_income" WHERE "return_id" = ?').run(returnId);
+          this.db.prepare('DELETE FROM "tds_salary" WHERE "return_id" = ?').run(returnId);
+          this.db.prepare('DELETE FROM "other_income" WHERE "return_id" = ?').run(returnId);
+          this.db.prepare('DELETE FROM "deductions_master" WHERE "return_id" = ?').run(returnId);
+        }
+
+        // 3. Delete returns
+        this.db.prepare('DELETE FROM "itr_return" WHERE "person_id" = ?').run(personId);
+
+        // 4. Delete other person-linked data
+        this.db.prepare('DELETE FROM "address" WHERE "person_id" = ?').run(personId);
+        this.db.prepare('DELETE FROM "bank_account" WHERE "person_id" = ?').run(personId);
+
+        // 5. Delete person
+        this.db.prepare('DELETE FROM "person" WHERE "person_id" = ?').run(personId);
+      }
+
+      // 6. Delete PAN-linked data
+      this.db.prepare('DELETE FROM "jurisdiction" WHERE "pan" = ?').run(pan);
+      this.db.prepare('DELETE FROM "pan_credentials" WHERE "pan" = ?').run(pan);
+
+      // Legacy/Cleanup
+      try {
+        this.db.prepare('DELETE FROM "itr_data" WHERE "pan" = ?').run(pan);
+      } catch (e) {
+        // Ignore if table doesn't exist
+      }
+    });
+
+    transaction();
   }
 }

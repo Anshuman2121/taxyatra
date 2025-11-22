@@ -5,6 +5,9 @@ import { api } from '../../api';
 import { ChevronDown, ChevronUp, Globe, Upload, Edit2, Save, X } from 'lucide-react';
 import { FetchProgressModal } from '../../components/FetchProgressModal';
 import DataPreviewModal from '../../components/DataPreviewModal';
+import { UserProfileSchema, PersonalDetailsSchema, AddressSchema, BankAccountSchema, JurisdictionSchema, Form49Schema } from '../../schemas/userProfile.schema';
+import { JsonUploadButton } from '../../components/JsonUploadButton';
+import { z } from 'zod';
 
 interface UserProfilePageProps {
     pan?: string;
@@ -22,13 +25,14 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
     });
 
     const [password, setPassword] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // State from original add-user page
     const [manualData, setManualData] = useState({
         prefix: 'Mr.', firstName: '', middleName: '', lastName: '',
         status: 'Individual', residence: 'Resident', panNumber: pan || '', employeeType: '', fileNo: '',
         gender: 'M', birthDate: '', seniorCitizen: false, businessName: '', verifiedBy: '', fatherName: '', capacity: '',
-        emailInReturn: '', itDepEmail: '',
+        emailInReturn: '', itDepEmail: '', aadhaarNumber: '', employerCategory: '',
         ward: '', areaCode: '', aoType: '', rangeCode: '', aoNo: '', oldWard: '',
         resFlat: '', resBuilding: '', resRoad: '', resArea: '', resCity: '', resPin: '', resState: '', resSTD: '', resPhone: '', resCountry: 'India',
         offFlat: '', offBuilding: '', offRoad: '', offArea: '', offCity: '', offPin: '', offState: '', offSTD: '', offPhone: '', offCountry: 'India', offEmail: '',
@@ -85,11 +89,8 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                     if (data.user) {
                         setManualData(prev => ({
                             ...prev,
-                            firstName: data.user.firstName || '',
-                            middleName: data.user.middleName || '',
-                            lastName: data.user.lastName || '',
+                            ...data.user,
                             panNumber: data.user.pan || pan,
-                            // ... map other fields
                         }));
                     }
                     if (data.bankAccounts) {
@@ -97,6 +98,9 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                     }
                     if (data.jurisdiction) {
                         setJurisdiction(data.jurisdiction);
+                    }
+                    if (data.form49) {
+                        setForm49(data.form49);
                     }
                 }
             } catch (error) {
@@ -107,6 +111,68 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
         };
         loadData();
     }, [pan]);
+
+    const validateField = (path: string, value: any, schema: z.ZodType<any>) => {
+        try {
+            schema.parse(value);
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[path];
+                return newErrors;
+            });
+            return true;
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const message = error.issues[0].message;
+                setErrors(prev => ({ ...prev, [path]: message }));
+            }
+            return false;
+        }
+    };
+
+    const validateForm = () => {
+        try {
+            UserProfileSchema.parse({
+                manualData,
+                bankAccounts,
+                jurisdiction,
+                form49
+            });
+            setErrors({});
+            return true;
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const newErrors: Record<string, string> = {};
+                error.issues.forEach((err: z.ZodIssue) => {
+                    const path = err.path.join('.');
+                    newErrors[path] = err.message;
+                });
+                setErrors(newErrors);
+
+                // Auto-expand sections with errors
+                const sectionsToExpand = { ...expandedSections };
+                let hasPersonalError = false;
+                let hasBankError = false;
+                let hasJurisdictionError = false;
+                let hasForm49Error = false;
+
+                error.issues.forEach((err: z.ZodIssue) => {
+                    if (err.path[0] === 'manualData') hasPersonalError = true;
+                    if (err.path[0] === 'bankAccounts') hasBankError = true;
+                    if (err.path[0] === 'jurisdiction') hasJurisdictionError = true;
+                    if (err.path[0] === 'form49') hasForm49Error = true;
+                });
+
+                if (hasPersonalError) sectionsToExpand.personal = true;
+                if (hasBankError) sectionsToExpand.bank = true;
+                if (hasJurisdictionError) sectionsToExpand.jurisdiction = true;
+                if (hasForm49Error) sectionsToExpand.form49 = true;
+
+                setExpandedSections(sectionsToExpand);
+            }
+            return false;
+        }
+    };
 
     // Helper to map API data to Form Data structure
     const mapApiDataToFormData = (apiData: any, currentManualData: any) => {
@@ -140,6 +206,9 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
             newData.resPin = addr.pinCd || '';
             newData.resCountry = addr.countryCode || '91';
             newData.resPhone = addr.phoneNo || '';
+            newData.resCountry = addr.countryCode || '91';
+            newData.resPhone = addr.phoneNo || '';
+            newData.employerCategory = pi.employerCategory || '';
         }
 
         if (apiData.bankAccountDtls && Array.isArray(apiData.bankAccountDtls)) {
@@ -170,16 +239,14 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
     };
 
     const handleFetchOnline = async () => {
-        const currentPan = manualData.panNumber || pan;
-
-        if (!currentPan) {
-            alert("Please enter a PAN Number.");
+        if (!manualData.panNumber) {
+            alert('Please enter a PAN number first');
             return;
         }
-
         if (!password) {
-            alert("Please enter the IT Portal Password.");
-            return;
+            const pwd = prompt('Enter IT Portal Password:');
+            if (!pwd) return;
+            setPassword(pwd);
         }
 
         setShowFetchModal(true);
@@ -187,73 +254,57 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
         setFetchComplete(false);
         setFetchError(false);
 
-        // Add progress listener
-        const progressListener = (_: any, status: string) => {
-            setFetchStatus(status);
-        };
-        // @ts-ignore - window.electronAPI might not be fully typed in this context
-        if (window.electronAPI && window.electronAPI.onFetchProgress) {
-            window.electronAPI.onFetchProgress(progressListener);
-        }
+        window.electron.ipcRenderer.removeAllListeners('fetch-progress');
+        window.electron.ipcRenderer.on('fetch-progress', (event: any, message: string) => {
+            setFetchStatus(message);
+        });
 
         try {
-            // Fetch profile using the provided password
-            setFetchStatus('Logging in to Income Tax Portal...');
-            const response = await api.fetchUserProfile(currentPan, password, false);
-
-            if (response.success && response.data) {
-                setFetchStatus('Processing data...');
-
-                // Map the fetched data immediately for preview
-                const mapped = mapApiDataToFormData(response.data, manualData);
-                setFetchedData(mapped); // Store the MAPPED data, not raw API data
-
-                setFetchComplete(true);
+            const result = await api.fetchUserProfile(manualData.panNumber, password || '', true);
+            if (result.success) {
                 setFetchStatus('Data fetched successfully!');
+                setFetchComplete(true);
+                setFetchedData(mapApiDataToFormData(result.data, manualData));
             } else {
-                throw new Error(response.message || 'Failed to fetch data');
+                setFetchStatus(result.message || 'Failed to fetch data');
+                setFetchError(true);
             }
-        } catch (err: any) {
-            console.error(err);
+        } catch (error: any) {
+            setFetchStatus(error.message || 'An error occurred');
             setFetchError(true);
-            setFetchStatus(err.message || 'Failed to fetch data');
         }
     };
 
-    const handlePreviewConfirm = () => {
-        if (!fetchedData) return;
-
-        // Update local state with fetched data (which is already mapped now)
-        setManualData(fetchedData.manualData);
-        if (fetchedData.bankAccounts && fetchedData.bankAccounts.length > 0) {
+    const handlePreviewConfirm = async () => {
+        if (fetchedData) {
+            setManualData(fetchedData.manualData);
             setBankAccounts(fetchedData.bankAccounts);
+            setJurisdiction(fetchedData.jurisdiction);
         }
-        if (fetchedData.jurisdiction && Object.keys(fetchedData.jurisdiction).length > 0) {
-            setJurisdiction(prev => ({ ...prev, ...fetchedData.jurisdiction }));
-        }
-
         setShowPreviewModal(false);
         setShowFetchModal(false);
-        alert('Data merged successfully! Please review the form and click Save.');
+        setMode('edit');
     };
 
     const handleSave = async () => {
+        if (!validateForm()) {
+            alert('Please fix the validation errors before saving.');
+            return;
+        }
+
         setIsLoading(true);
         try {
             const dataToSave = {
+                pan: manualData.panNumber,
                 user: { ...manualData, pan: manualData.panNumber },
                 bankAccounts,
                 jurisdiction,
                 form49
             };
 
-            if (pan) {
-                await api.updateUserDetails(dataToSave);
-            } else {
-                await api.saveFetchedProfile(dataToSave);
-            }
+            // Always use updateUserDetails as it handles the user form structure
+            await api.updateUserDetails(dataToSave);
 
-            // Save password if provided
             if (manualData.panNumber && password) {
                 await api.savePanCredentials(manualData.panNumber, password);
             }
@@ -269,15 +320,105 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
     };
 
     const toggleSection = (section: keyof typeof expandedSections) => {
-        setExpandedSections(prev => ({
-            ...prev,
-            [section]: !prev[section]
-        }));
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    // Helper to handle manual data changes
     const handleManualDataChange = (field: string, value: any) => {
-        setManualData(prev => ({ ...prev, [field]: value }));
+        setManualData(prev => {
+            const newData = { ...prev, [field]: value };
+            if (errors[`manualData.${field}`]) {
+                setErrors(prevErr => {
+                    const newErr = { ...prevErr };
+                    delete newErr[`manualData.${field}`];
+                    return newErr;
+                });
+            }
+            return newData;
+        });
+    };
+
+    const handleJsonUpload = (data: any) => {
+        let updatedManualData = manualData;
+        let updatedBankAccounts = bankAccounts;
+
+        if (data.manualData) {
+            updatedManualData = {
+                ...manualData,
+                ...data.manualData
+            };
+            setManualData(updatedManualData);
+        }
+        if (data.bankAccounts && data.bankAccounts.length > 0) {
+            updatedBankAccounts = data.bankAccounts;
+            setBankAccounts(updatedBankAccounts);
+        }
+
+        setMode('edit');
+
+        // Validate the uploaded data and show errors
+        try {
+            UserProfileSchema.parse({
+                manualData: updatedManualData,
+                bankAccounts: updatedBankAccounts,
+                jurisdiction,
+                form49
+            });
+            setErrors({});
+            alert('Data loaded from JSON file successfully! All fields are valid.');
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const newErrors: Record<string, string> = {};
+                error.issues.forEach((err: z.ZodIssue) => {
+                    const path = err.path.join('.');
+                    newErrors[path] = err.message;
+                });
+                setErrors(newErrors);
+
+                // Auto-expand sections with errors
+                const sectionsToExpand = { ...expandedSections };
+                let hasPersonalError = false;
+                let hasBankError = false;
+                let hasJurisdictionError = false;
+                let hasForm49Error = false;
+
+                error.issues.forEach((err: z.ZodIssue) => {
+                    if (err.path[0] === 'manualData') hasPersonalError = true;
+                    if (err.path[0] === 'bankAccounts') hasBankError = true;
+                    if (err.path[0] === 'jurisdiction') hasJurisdictionError = true;
+                    if (err.path[0] === 'form49') hasForm49Error = true;
+                });
+
+                if (hasPersonalError) sectionsToExpand.personal = true;
+                if (hasBankError) sectionsToExpand.bank = true;
+                if (hasJurisdictionError) sectionsToExpand.jurisdiction = true;
+                if (hasForm49Error) sectionsToExpand.form49 = true;
+
+                setExpandedSections(sectionsToExpand);
+
+                const errorCount = error.issues.length;
+                alert(`Data loaded from JSON file. Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} before saving.`);
+            }
+        }
+    };
+
+    const handleBlur = (section: 'manualData' | 'jurisdiction' | 'form49', field: string, value: any) => {
+        let schema;
+        if (section === 'manualData') {
+            const shape = UserProfileSchema.shape.manualData.shape as any;
+            if (shape[field]) {
+                schema = shape[field];
+            }
+        } else if (section === 'jurisdiction') {
+            const shape = JurisdictionSchema.shape as any;
+            if (shape[field]) schema = shape[field];
+        } else if (section === 'form49') {
+            const shape = Form49Schema.shape as any;
+            if (shape[field]) schema = shape[field];
+        }
+
+        if (schema) {
+            validateField(`${section}.${field}`, value, schema);
+        }
     };
 
     const getHeaderTitle = () => {
@@ -309,7 +450,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
 
                     {/* Left Column - Main Form */}
                     <div className="lg:col-span-4 space-y-6">
-
                         {/* Personal Details Section */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <button
@@ -323,7 +463,34 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                             {expandedSections.personal && (
                                 <div className="p-6 bg-white animate-in slide-in-from-top-2 duration-200 space-y-6">
 
-                                    {/* Assessee Name */}
+
+                                    {/* Identification */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">PAN</label>
+                                            <input
+                                                type="text"
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 uppercase disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.panNumber'] ? 'border-red-500' : 'border-slate-200'}`}
+                                                maxLength={10}
+                                                value={manualData.panNumber}
+                                                onChange={(e) => handleManualDataChange('panNumber', e.target.value.toUpperCase())}
+                                                onBlur={(e) => handleBlur('manualData', 'panNumber', e.target.value)}
+                                                disabled={mode === 'view'}
+                                            />
+                                            {errors['manualData.panNumber'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.panNumber']}</p>}
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">IT Portal Password</label>
+                                            <input
+                                                type="password"
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                disabled={mode === 'view'}
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Assessee Name</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -342,40 +509,43 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                 <label className="block text-xs font-medium text-slate-500 mb-1">First Name</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                    placeholder="First Name"
+                                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.firstName'] ? 'border-red-500' : 'border-slate-200'}`}
                                                     value={manualData.firstName}
                                                     onChange={(e) => handleManualDataChange('firstName', e.target.value)}
+                                                    onBlur={(e) => handleBlur('manualData', 'firstName', e.target.value)}
                                                     disabled={mode === 'view'}
                                                 />
+                                                {errors['manualData.firstName'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.firstName']}</p>}
                                             </div>
                                             <div className="md:col-span-1">
                                                 <label className="block text-xs font-medium text-slate-500 mb-1">Middle Name</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                    placeholder="Middle Name"
+                                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.middleName'] ? 'border-red-500' : 'border-slate-200'}`}
                                                     value={manualData.middleName}
                                                     onChange={(e) => handleManualDataChange('middleName', e.target.value)}
+                                                    onBlur={(e) => handleBlur('manualData', 'middleName', e.target.value)}
                                                     disabled={mode === 'view'}
                                                 />
+                                                {errors['manualData.middleName'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.middleName']}</p>}
                                             </div>
                                             <div className="md:col-span-1">
                                                 <label className="block text-xs font-medium text-slate-500 mb-1">Last Name</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                    placeholder="Last Name"
+                                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.lastName'] ? 'border-red-500' : 'border-slate-200'}`}
                                                     value={manualData.lastName}
                                                     onChange={(e) => handleManualDataChange('lastName', e.target.value)}
+                                                    onBlur={(e) => handleBlur('manualData', 'lastName', e.target.value)}
                                                     disabled={mode === 'view'}
                                                 />
+                                                {errors['manualData.lastName'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.lastName']}</p>}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Status & Residence */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Status & Residence & Aadhaar */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
                                             <select
@@ -398,39 +568,48 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                 <option>Resident</option><option>Non-Resident</option><option>Resident but not ordinarily resident</option>
                                             </select>
                                         </div>
-                                    </div>
-
-                                    {/* Identification */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">PAN</label>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Aadhaar Number</label>
                                             <input
                                                 type="text"
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 uppercase disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="PAN"
-                                                maxLength={10}
-                                                value={manualData.panNumber}
-                                                onChange={(e) => handleManualDataChange('panNumber', e.target.value.toUpperCase())}
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.aadhaarNumber'] ? 'border-red-500' : 'border-slate-200'}`}
+                                                maxLength={12}
+                                                value={manualData.aadhaarNumber}
+                                                onChange={(e) => handleManualDataChange('aadhaarNumber', e.target.value)}
+                                                onBlur={(e) => handleBlur('manualData', 'aadhaarNumber', e.target.value)}
                                                 disabled={mode === 'view'}
                                             />
+                                            {errors['manualData.aadhaarNumber'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.aadhaarNumber']}</p>}
                                         </div>
+                                    </div>
+
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">IT Portal Password</label>
-                                            <input
-                                                type="password"
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="Password"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Employer Category</label>
+                                            <select
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900"
+                                                value={manualData.employerCategory}
+                                                onChange={(e) => handleManualDataChange('employerCategory', e.target.value)}
                                                 disabled={mode === 'view'}
-                                            />
+                                            >
+                                                <option value="">Select Category</option>
+                                                <option value="CGOV">Central Govt</option>
+                                                <option value="SGOV">State Govt</option>
+                                                <option value="PSU">Public Sector Unit</option>
+                                                <option value="PE">Pensioners - CG</option>
+                                                <option value="PESG">Pensioners - SG</option>
+                                                <option value="PEPS">Pensioners - PSU</option>
+                                                <option value="PEO">Pensioners - Others</option>
+                                                <option value="OTH">Others</option>
+                                                <option value="NA">Not Applicable</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-slate-500 mb-1">Employee Type</label>
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="Employee Type"
                                                 value={manualData.employeeType}
                                                 onChange={(e) => handleManualDataChange('employeeType', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -441,7 +620,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="File #"
                                                 value={manualData.fileNo}
                                                 onChange={(e) => handleManualDataChange('fileNo', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -466,11 +644,13 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <label className="block text-xs font-medium text-slate-500 mb-1">Birth Date</label>
                                             <input
                                                 type="date"
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.birthDate'] ? 'border-red-500' : 'border-slate-200'}`}
                                                 value={manualData.birthDate}
                                                 onChange={(e) => handleManualDataChange('birthDate', e.target.value)}
+                                                onBlur={(e) => handleBlur('manualData', 'birthDate', e.target.value)}
                                                 disabled={mode === 'view'}
                                             />
+                                            {errors['manualData.birthDate'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.birthDate']}</p>}
                                         </div>
                                         <div className="flex items-center h-10">
                                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -493,7 +673,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="Business Name"
                                                 value={manualData.businessName}
                                                 onChange={(e) => handleManualDataChange('businessName', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -504,7 +683,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="Verified By"
                                                 value={manualData.verifiedBy}
                                                 onChange={(e) => handleManualDataChange('verifiedBy', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -519,7 +697,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="Father Name"
                                                 value={manualData.fatherName}
                                                 onChange={(e) => handleManualDataChange('fatherName', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -530,7 +707,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="Capacity"
                                                 value={manualData.capacity}
                                                 onChange={(e) => handleManualDataChange('capacity', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -544,19 +720,19 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <label className="block text-xs font-medium text-slate-500 mb-1">e-Mail in Return</label>
                                             <input
                                                 type="email"
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="e-Mail in Return"
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.emailInReturn'] ? 'border-red-500' : 'border-slate-200'}`}
                                                 value={manualData.emailInReturn}
                                                 onChange={(e) => handleManualDataChange('emailInReturn', e.target.value)}
+                                                onBlur={(e) => handleBlur('manualData', 'emailInReturn', e.target.value)}
                                                 disabled={mode === 'view'}
                                             />
+                                            {errors['manualData.emailInReturn'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.emailInReturn']}</p>}
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-slate-500 mb-1">IT Dep. e-Mail</label>
                                             <input
                                                 type="email"
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900"
-                                                placeholder="IT Dep. e-Mail"
                                                 value={manualData.itDepEmail}
                                                 onChange={(e) => handleManualDataChange('itDepEmail', e.target.value)}
                                                 disabled={mode === 'view'}
@@ -587,7 +763,10 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resCity} onChange={(e) => handleManualDataChange('resCity', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Pin" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resPin} onChange={(e) => handleManualDataChange('resPin', e.target.value)} maxLength={6} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="Pin" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.resPin'] ? 'border-red-500' : 'border-slate-200'}`} value={manualData.resPin} onChange={(e) => handleManualDataChange('resPin', e.target.value)} onBlur={(e) => handleBlur('manualData', 'resPin', e.target.value)} maxLength={6} disabled={mode === 'view'} />
+                                                {errors['manualData.resPin'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.resPin']}</p>}
+                                            </div>
                                             <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resState} onChange={(e) => handleManualDataChange('resState', e.target.value)} disabled={mode === 'view'} />
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -636,7 +815,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                 </div>
                             )}
                         </div>
-
                         {/* Bank Details Section */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <button
@@ -662,28 +840,40 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                 )}
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <input placeholder="Bank Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.bankName} onChange={(e) => {
-                                                    const updated = [...bankAccounts];
-                                                    updated[index].bankName = e.target.value;
-                                                    setBankAccounts(updated);
-                                                }} disabled={mode === 'view'} />
-                                                <input placeholder="Branch" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.branch} onChange={(e) => {
-                                                    const updated = [...bankAccounts];
-                                                    updated[index].branch = e.target.value;
-                                                    setBankAccounts(updated);
-                                                }} disabled={mode === 'view'} />
+                                                <div>
+                                                    <input placeholder="Bank Name" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.bankName`] ? 'border-red-500' : 'border-slate-200'}`} value={account.bankName} onChange={(e) => {
+                                                        const updated = [...bankAccounts];
+                                                        updated[index].bankName = e.target.value;
+                                                        setBankAccounts(updated);
+                                                    }} disabled={mode === 'view'} />
+                                                    {errors[`bankAccounts.${index}.bankName`] && <p className="text-red-500 text-xs mt-1">{errors[`bankAccounts.${index}.bankName`]}</p>}
+                                                </div>
+                                                <div>
+                                                    <input placeholder="Branch" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.branch`] ? 'border-red-500' : 'border-slate-200'}`} value={account.branch} onChange={(e) => {
+                                                        const updated = [...bankAccounts];
+                                                        updated[index].branch = e.target.value;
+                                                        setBankAccounts(updated);
+                                                    }} disabled={mode === 'view'} />
+                                                    {errors[`bankAccounts.${index}.branch`] && <p className="text-red-500 text-xs mt-1">{errors[`bankAccounts.${index}.branch`]}</p>}
+                                                </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <input placeholder="Account Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.accountNumber} onChange={(e) => {
-                                                    const updated = [...bankAccounts];
-                                                    updated[index].accountNumber = e.target.value;
-                                                    setBankAccounts(updated);
-                                                }} disabled={mode === 'view'} />
-                                                <input placeholder="IFSC Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.ifsc} onChange={(e) => {
-                                                    const updated = [...bankAccounts];
-                                                    updated[index].ifsc = e.target.value.toUpperCase();
-                                                    setBankAccounts(updated);
-                                                }} maxLength={11} disabled={mode === 'view'} />
+                                                <div>
+                                                    <input placeholder="Account Number" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.accountNumber`] ? 'border-red-500' : 'border-slate-200'}`} value={account.accountNumber} onChange={(e) => {
+                                                        const updated = [...bankAccounts];
+                                                        updated[index].accountNumber = e.target.value;
+                                                        setBankAccounts(updated);
+                                                    }} disabled={mode === 'view'} />
+                                                    {errors[`bankAccounts.${index}.accountNumber`] && <p className="text-red-500 text-xs mt-1">{errors[`bankAccounts.${index}.accountNumber`]}</p>}
+                                                </div>
+                                                <div>
+                                                    <input placeholder="IFSC Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.ifsc`] ? 'border-red-500' : 'border-slate-200'}`} value={account.ifsc} onChange={(e) => {
+                                                        const updated = [...bankAccounts];
+                                                        updated[index].ifsc = e.target.value.toUpperCase();
+                                                        setBankAccounts(updated);
+                                                    }} maxLength={11} disabled={mode === 'view'} />
+                                                    {errors[`bankAccounts.${index}.ifsc`] && <p className="text-red-500 text-xs mt-1">{errors[`bankAccounts.${index}.ifsc`]}</p>}
+                                                </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-100 disabled:text-slate-900" value={account.accountType} onChange={(e) => {
@@ -691,7 +881,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     updated[index].accountType = e.target.value;
                                                     setBankAccounts(updated);
                                                 }} disabled={mode === 'view'}>
-                                                    <option>Savings</option><option>Current</option><option>Cash Credit</option><option>Overdraft</option>
+                                                    <option>Savings</option><option>Current</option><option>Cash Credit</option><option>Overdraft</option><option>NRO</option><option>Other</option>
                                                 </select>
                                                 <input placeholder="Name as per Bank" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.nameAsPerBank} onChange={(e) => {
                                                     const updated = [...bankAccounts];
@@ -712,7 +902,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                 </div>
                             )}
                         </div>
-
                         {/* Jurisdiction Section */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <button
@@ -728,15 +917,30 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Assessing Officer Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <input placeholder="Area Description" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.areaDesc} onChange={(e) => setJurisdiction({ ...jurisdiction, areaDesc: e.target.value })} disabled={mode === 'view'} />
-                                            <input placeholder="Area Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.areaCd} onChange={(e) => setJurisdiction({ ...jurisdiction, areaCd: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="Area Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.areaCd'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.areaCd} onChange={(e) => setJurisdiction({ ...jurisdiction, areaCd: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'areaCd', e.target.value)} disabled={mode === 'view'} />
+                                                {errors['jurisdiction.areaCd'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.areaCd']}</p>}
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="AO Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoPplrName} onChange={(e) => setJurisdiction({ ...jurisdiction, aoPplrName: e.target.value })} disabled={mode === 'view'} />
-                                            <input placeholder="Range Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.rangeCd} onChange={(e) => setJurisdiction({ ...jurisdiction, rangeCd: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="AO Name" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.aoPplrName'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.aoPplrName} onChange={(e) => setJurisdiction({ ...jurisdiction, aoPplrName: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'aoPplrName', e.target.value)} disabled={mode === 'view'} />
+                                                {errors['jurisdiction.aoPplrName'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.aoPplrName']}</p>}
+                                            </div>
+                                            <div>
+                                                <input placeholder="Range Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.rangeCd'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.rangeCd} onChange={(e) => setJurisdiction({ ...jurisdiction, rangeCd: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'rangeCd', e.target.value)} disabled={mode === 'view'} />
+                                                {errors['jurisdiction.rangeCd'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.rangeCd']}</p>}
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="AO Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoNo} onChange={(e) => setJurisdiction({ ...jurisdiction, aoNo: e.target.value })} disabled={mode === 'view'} />
-                                            <input placeholder="AO Email" type="email" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoEmailId} onChange={(e) => setJurisdiction({ ...jurisdiction, aoEmailId: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="AO Number" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.aoNo'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.aoNo} onChange={(e) => setJurisdiction({ ...jurisdiction, aoNo: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'aoNo', e.target.value)} disabled={mode === 'view'} />
+                                                {errors['jurisdiction.aoNo'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.aoNo']}</p>}
+                                            </div>
+                                            <div>
+                                                <input placeholder="AO Email" type="email" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.aoEmailId'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.aoEmailId} onChange={(e) => setJurisdiction({ ...jurisdiction, aoEmailId: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'aoEmailId', e.target.value)} disabled={mode === 'view'} />
+                                                {errors['jurisdiction.aoEmailId'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.aoEmailId']}</p>}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
@@ -746,13 +950,15 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.city} onChange={(e) => setJurisdiction({ ...jurisdiction, city: e.target.value })} disabled={mode === 'view'} />
                                             <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.state} onChange={(e) => setJurisdiction({ ...jurisdiction, state: e.target.value })} disabled={mode === 'view'} />
-                                            <input placeholder="Pin Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.pinCode} onChange={(e) => setJurisdiction({ ...jurisdiction, pinCode: e.target.value })} maxLength={6} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="Pin Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.pinCode'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.pinCode} onChange={(e) => setJurisdiction({ ...jurisdiction, pinCode: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'pinCode', e.target.value)} maxLength={6} disabled={mode === 'view'} />
+                                                {errors['jurisdiction.pinCode'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.pinCode']}</p>}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             )}
                         </div>
-
                         {/* Form 49A/49AA Section */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <button
@@ -776,7 +982,10 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <input placeholder="Source of Income" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.sourceOfIncome} onChange={(e) => setForm49({ ...form49, sourceOfIncome: e.target.value })} disabled={mode === 'view'} />
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input placeholder="Aadhaar Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.aadhaarNumber} onChange={(e) => setForm49({ ...form49, aadhaarNumber: e.target.value })} maxLength={12} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="Aadhaar Number" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['form49.aadhaarNumber'] ? 'border-red-500' : 'border-slate-200'}`} value={form49.aadhaarNumber} onChange={(e) => setForm49({ ...form49, aadhaarNumber: e.target.value })} onBlur={(e) => handleBlur('form49', 'aadhaarNumber', e.target.value)} maxLength={12} disabled={mode === 'view'} />
+                                                {errors['form49.aadhaarNumber'] && <p className="text-red-500 text-xs mt-1">{errors['form49.aadhaarNumber']}</p>}
+                                            </div>
                                             <input type="date" placeholder="Application Date" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.applicationDate} onChange={(e) => setForm49({ ...form49, applicationDate: e.target.value })} disabled={mode === 'view'} />
                                             <input placeholder="Acknowledgement No." className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.acknowledgementNumber} onChange={(e) => setForm49({ ...form49, acknowledgementNumber: e.target.value })} disabled={mode === 'view'} />
                                         </div>
@@ -784,7 +993,10 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Name Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="Name on PAN Card" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.nameOnCard} onChange={(e) => setForm49({ ...form49, nameOnCard: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <input placeholder="Name on PAN Card" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['form49.nameOnCard'] ? 'border-red-500' : 'border-slate-200'}`} value={form49.nameOnCard} onChange={(e) => setForm49({ ...form49, nameOnCard: e.target.value })} onBlur={(e) => handleBlur('form49', 'nameOnCard', e.target.value)} disabled={mode === 'view'} />
+                                                {errors['form49.nameOnCard'] && <p className="text-red-500 text-xs mt-1">{errors['form49.nameOnCard']}</p>}
+                                            </div>
                                             <input placeholder="Father's Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.fatherName} onChange={(e) => setForm49({ ...form49, fatherName: e.target.value })} disabled={mode === 'view'} />
                                         </div>
                                         <input placeholder="Mother's Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.motherName} onChange={(e) => setForm49({ ...form49, motherName: e.target.value })} disabled={mode === 'view'} />
@@ -829,10 +1041,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                     </div>
                                 )}
 
-                                <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors">
-                                    <Upload className="w-4 h-4" />
-                                    <span>Upload JSON</span>
-                                </button>
+                                <JsonUploadButton onUpload={handleJsonUpload} />
 
                                 <div className="h-px bg-slate-100 my-2"></div>
 
@@ -865,6 +1074,39 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                 )}
                             </div>
                         </div>
+
+                        {/* Validation Errors Summary */}
+                        {Object.keys(errors).length > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
+                                <h3 className="text-sm font-semibold text-red-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                    Validation Errors ({Object.keys(errors).length})
+                                </h3>
+                                <div className="space-y-2 max-h-96 overflow-y-auto">
+                                    {Object.entries(errors).map(([path, message]) => {
+                                        // Format the field path to be more readable
+                                        const fieldName = path.split('.').map((part, index) => {
+                                            if (part === 'manualData') return 'Personal';
+                                            if (part === 'bankAccounts') return 'Bank';
+                                            if (part === 'jurisdiction') return 'Jurisdiction';
+                                            if (part === 'form49') return 'Form 49';
+                                            // Convert camelCase to Title Case
+                                            if (index > 0 && !isNaN(Number(part))) return `#${Number(part) + 1}`;
+                                            return part.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                                        }).join(' → ');
+
+                                        return (
+                                            <div key={path} className="bg-white border border-red-200 rounded-lg p-3">
+                                                <p className="text-xs font-medium text-red-900 mb-1">{fieldName}</p>
+                                                <p className="text-xs text-red-700">{message}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                 </div>
@@ -895,6 +1137,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                 currentData={{ manualData, bankAccounts, jurisdiction }}
                 newData={fetchedData}
             />
-        </div>
+        </div >
     );
 }

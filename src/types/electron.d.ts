@@ -8,6 +8,7 @@ export interface ElectronAPI {
   saveFetchedProfile: (data: any) => Promise<any>;
   getUserData: (pan: string) => Promise<{ success: boolean; data?: any; message?: string }>;
   getAllUsers: () => Promise<{ success: boolean; data?: any[]; message?: string }>;
+  deleteUser: (pan: string) => Promise<{ success: boolean; message?: string }>;
   updateUserDetails: (data: any) => Promise<{ success: boolean; message?: string }>;
   onFetchProgress: (callback: (event: any, status: string) => void) => void;
   // Registration API

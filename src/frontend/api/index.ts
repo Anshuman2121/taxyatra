@@ -8,5 +8,6 @@ export const api = {
     saveFetchedProfile: (data: any) => window.electronAPI.saveFetchedProfile(data),
     getUserData: (pan: string) => window.electronAPI.getUserData(pan),
     getAllUsers: () => window.electronAPI.getAllUsers(),
+    deleteUser: (pan: string) => window.electronAPI.deleteUser(pan),
     updateUserDetails: (data: any) => window.electronAPI.updateUserDetails(data)
 };
