@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../api';
-import { TopNavBar } from './TopNavBar';
-import { BottomBar } from './BottomBar';
+import { api } from '../../api';
+import { TopNavBar } from '../../components/TopNavBar';
+import { BottomBar } from '../../components/BottomBar';
 import { Loader2, Pencil, RefreshCw, Save, X } from 'lucide-react';
-import { FetchProgressModal } from './FetchProgressModal';
-import DataPreviewModal from './DataPreviewModal';
+import { FetchProgressModal } from '../../components/FetchProgressModal';
+import DataPreviewModal from '../../components/DataPreviewModal';
 
 interface UserDetailsPageProps {
     pan: string;

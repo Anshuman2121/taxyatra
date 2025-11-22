@@ -90,3 +90,12 @@ typings/
 
 # Electron-Forge
 out/
+
+# Build artifacts
+output.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

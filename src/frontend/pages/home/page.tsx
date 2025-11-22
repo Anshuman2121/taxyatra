@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../api';
-import { TopNavBar } from './TopNavBar';
-import { BottomBar } from './BottomBar';
+import { api } from '../../api';
+import { TopNavBar } from '../../components/TopNavBar';
+import { BottomBar } from '../../components/BottomBar';
 import {
   Table,
   TableBody,
@@ -9,7 +9,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "../../components/ui/table";
 
 interface HomePageProps {
   onNavigate: (page: string, selectedPan?: string) => void;

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../api';
-import { TopNavBar } from './TopNavBar';
-import { BottomBar } from './BottomBar';
-import { PrefillDataDisplay } from './PrefillDataDisplay';
-import { FetchProgressModal } from './FetchProgressModal';
+import { api } from '../../api';
+import { TopNavBar } from '../../components/TopNavBar';
+import { BottomBar } from '../../components/BottomBar';
+import { PrefillDataDisplay } from '../../components/PrefillDataDisplay';
+import { FetchProgressModal } from '../../components/FetchProgressModal';
 
 interface AddUserPageProps {
   onBack: () => void;
