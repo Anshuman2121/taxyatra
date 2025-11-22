@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import RegistrationPage from './pages/registration/page';
 import { Loader2 } from 'lucide-react';
 import { HomePage } from './pages/home/page';
-import { AddUserPage } from './pages/add-user/page';
-import { UserDetailsPage } from './pages/user-details/page';
+import { UserProfilePage } from './pages/user-profile/page';
 
 function App() {
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null); // null = loading
@@ -57,13 +56,12 @@ function App() {
         <HomePage onNavigate={handleNavigate} />
       )}
       {currentPage === 'add-user' && (
-        <AddUserPage
+        <UserProfilePage
           onBack={() => handleNavigate('home')}
-          selectedPan={selectedPan}
         />
       )}
       {currentPage === 'user-details' && selectedPan && (
-        <UserDetailsPage
+        <UserProfilePage
           pan={selectedPan}
           onBack={() => handleNavigate('home')}
         />
