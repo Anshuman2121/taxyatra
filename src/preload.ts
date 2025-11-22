@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteUser: (pan: string) => ipcRenderer.invoke('delete-user', pan),
   updateUserDetails: (data: any) => ipcRenderer.invoke('update-user-details', data),
   onFetchProgress: (callback: (event: any, status: string) => void) => ipcRenderer.on('fetch-progress', callback),
+  removeAllFetchProgressListeners: () => ipcRenderer.removeAllListeners('fetch-progress'),
   // Registration API
   checkRegistration: () => ipcRenderer.invoke('registration:check'),
   submitRegistration: (licenseKey: string) => ipcRenderer.invoke('registration:submit', licenseKey),

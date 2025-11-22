@@ -11,6 +11,7 @@ export interface ElectronAPI {
   deleteUser: (pan: string) => Promise<{ success: boolean; message?: string }>;
   updateUserDetails: (data: any) => Promise<{ success: boolean; message?: string }>;
   onFetchProgress: (callback: (event: any, status: string) => void) => void;
+  removeAllFetchProgressListeners: () => void;
   // Registration API
   checkRegistration: () => Promise<any>;
   submitRegistration: (licenseKey: string) => Promise<any>;

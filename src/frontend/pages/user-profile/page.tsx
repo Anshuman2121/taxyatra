@@ -188,38 +188,105 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
             newData.middleName = pi.assesseeName?.middleName || '';
             newData.lastName = pi.assesseeName?.surNameOrOrgName || '';
             newData.panNumber = apiData.pan || pan || newData.panNumber;
-            newData.status = pi.status || 'Individual';
+
+            // Status Mapping
+            const statusMap: Record<string, string> = {
+                'I': 'Individual', 'IND': 'Individual',
+                'H': 'HUF', 'HUF': 'HUF',
+                'F': 'Firm', 'FIRM': 'Firm',
+                'C': 'Company', 'DOMESTIC COMPANY': 'Company',
+                'A': 'AOP', 'AOP': 'AOP',
+                'B': 'BOI', 'BOI': 'BOI',
+                'T': 'Trust', 'TRUST': 'Trust'
+            };
+            newData.status = statusMap[pi.status] || pi.status || 'Individual';
+
             newData.dob = pi.dob || '';
             newData.birthDate = pi.dob ? new Date(pi.dob).toISOString().split('T')[0] : '';
             newData.gender = pi.gender || 'M';
-            newData.aadhaarNumber = pi.aadhaarCardNo || '';
+
+            // Decode Aadhaar if it's base64
+            let aadhaar = pi.aadhaarCardNo || '';
+            if (aadhaar && /^[A-Za-z0-9+/=]+$/.test(aadhaar) && !/^\d+$/.test(aadhaar)) {
+                try {
+                    aadhaar = atob(aadhaar);
+                } catch (e) {
+                    console.error('Failed to decode Aadhaar:', e);
+                }
+            }
+            newData.aadhaarNumber = aadhaar;
+
             newData.mobile = addr.mobileNo || '';
             newData.emailInReturn = addr.emailAddress || '';
 
             // Address mapping
-            newData.resFlat = addr.addrLine1Txt || '';
-            newData.resBuilding = addr.addrLine2Txt || '';
-            newData.resRoad = addr.addrLine3Txt || '';
-            newData.resArea = addr.addrLine4Txt || '';
-            newData.resCity = addr.city || '';
-            newData.resState = addr.stateCd || '';
-            newData.resPin = addr.pinCd || '';
+            newData.resFlat = addr.residenceNo || addr.addrLine1Txt || '';
+            newData.resBuilding = addr.residenceName || addr.addrLine2Txt || '';
+            newData.resRoad = addr.roadOrStreet || addr.addrLine3Txt || '';
+            newData.resArea = addr.localityOrArea || addr.addrLine4Txt || '';
+            newData.resArea = addr.localityOrArea || addr.addrLine4Txt || '';
+
+            // City Fallback: If city is empty, try locality, then road
+            let city = addr.cityOrTownOrDistrict || addr.city || '';
+            if (!city) {
+                city = addr.localityOrArea || addr.addrLine4Txt || '';
+            }
+            if (!city) {
+                city = addr.roadOrStreet || addr.addrLine3Txt || '';
+            }
+            newData.resCity = city;
+
+            newData.resState = addr.stateCode || addr.stateCd || '';
+
+            // Pin Code - ensure string
+            const pin = addr.pinCode || addr.pinCd;
+            newData.resPin = pin ? String(pin) : '';
+
             newData.resCountry = addr.countryCode || '91';
-            newData.resPhone = addr.phoneNo || '';
-            newData.resCountry = addr.countryCode || '91';
-            newData.resPhone = addr.phoneNo || '';
-            newData.employerCategory = pi.employerCategory || '';
+            newData.resPhone = addr.phone?.phoneNo || addr.phoneNo || '';
+
+            // Employer Category Mapping
+            const empCatMap: Record<string, string> = {
+                'CGOV': 'CGOV', 'SGOV': 'SGOV', 'PSU': 'PSU',
+                'PE': 'PE', 'PESG': 'PESG', 'PEPS': 'PEPS', 'PEO': 'PEO',
+                'OTH': 'OTH', 'NA': 'NA'
+            };
+            // Default to 'NA' if empty or invalid, or keep original if it matches
+            const rawEmpCat = pi.employerCategory || '';
+            newData.employerCategory = empCatMap[rawEmpCat] || (rawEmpCat ? 'OTH' : 'NA');
         }
 
+        // Handle Bank Accounts - check for nested structure in prefill data
         if (apiData.bankAccountDtls && Array.isArray(apiData.bankAccountDtls)) {
-            newBankAccounts = apiData.bankAccountDtls.map((acc: any) => ({
-                bankName: acc.bankName || '',
-                branch: acc.bankBrnchTxt || '',
-                accountNumber: acc.bankAcctNum || '',
-                ifsc: acc.ifscCd || '',
-                accountType: acc.accountType || 'Savings',
-                nameAsPerBank: acc.nameAsPerBank || ''
-            }));
+            // Check if it's the prefill structure where bank accounts are inside addtnlBankDetails
+            let accountsToMap = apiData.bankAccountDtls;
+
+            // If the first item has addtnlBankDetails, flatten it
+            if (accountsToMap.length > 0 && accountsToMap[0].addtnlBankDetails) {
+                accountsToMap = accountsToMap.flatMap((item: any) => item.addtnlBankDetails || []);
+            }
+
+            newBankAccounts = accountsToMap.map((acc: any) => {
+                // Account Type Mapping
+                const accTypeMap: Record<string, string> = {
+                    'SB': 'Savings', 'SAVINGS': 'Savings',
+                    'CA': 'Current', 'CURRENT': 'Current',
+                    'CC': 'Cash Credit',
+                    'OD': 'Overdraft',
+                    'NRO': 'NRO',
+                    'OTH': 'Other'
+                };
+                const rawType = acc.AccountType || acc.accountType || 'Savings';
+
+                return {
+                    bankName: acc.bankName || '',
+                    branch: acc.bankBrnchTxt || '', // Prefill might not have branch
+                    accountNumber: acc.bankAccountNo || acc.bankAcctNum || '',
+                    ifsc: acc.ifsccode || acc.ifscCd || '',
+                    accountType: accTypeMap[rawType] || rawType,
+                    nameAsPerBank: acc.nameAsPerBank || ''
+                };
+            });
         }
 
         if (apiData.jurisdiction) {
@@ -254,8 +321,8 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
         setFetchComplete(false);
         setFetchError(false);
 
-        window.electron.ipcRenderer.removeAllListeners('fetch-progress');
-        window.electron.ipcRenderer.on('fetch-progress', (event: any, message: string) => {
+        window.electronAPI.removeAllFetchProgressListeners();
+        window.electronAPI.onFetchProgress((event: any, message: string) => {
             setFetchStatus(message);
         });
 
@@ -264,7 +331,12 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
             if (result.success) {
                 setFetchStatus('Data fetched successfully!');
                 setFetchComplete(true);
-                setFetchedData(mapApiDataToFormData(result.data, manualData));
+
+                // Immediately show preview
+                const mappedData = mapApiDataToFormData(result.data, manualData);
+                setFetchedData(mappedData);
+                setShowFetchModal(false);
+                setShowPreviewModal(true);
             } else {
                 setFetchStatus(result.message || 'Failed to fetch data');
                 setFetchError(true);

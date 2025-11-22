@@ -19,8 +19,6 @@
     "dist:mac": "npm run build && electron-builder build --mac --x64 --arm64",
     "dist:linux": "npm run build && electron-builder build --linux",
     "dist:all": "npm run build && electron-builder build -mwl",
-    "clear-db": "node dev-tools/clear-db.js",
-    "clear-cache": "node dev-tools/clear-mac-cache.js",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
