@@ -112,7 +112,14 @@ class RegistrationService {
             }
         } catch (error: any) {
             console.error('Registration failed:', error);
-            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Network error';
+
+            let msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Network error';
+
+            // Handle the specific server crash that happens when a license key is not found
+            if (error.response?.status === 500) {
+                msg = 'License is not valid. Please check your key.';
+            }
+
             return { success: false, error: msg };
         }
     }

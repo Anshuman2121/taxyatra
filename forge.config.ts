@@ -4,6 +4,7 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerDMG } from '@electron-forge/maker-dmg';
+import { MakerWix } from '@electron-forge/maker-wix';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
@@ -30,16 +31,67 @@ const config: ForgeConfig = {
     name: 'TaxYatra',
     executableName: 'TaxYatra',
     
-    // CRITICAL FIX: Empty ignore array
-    // This prevents Vite plugin from excluding node_modules
-    // Allows AutoUnpackNativesPlugin to work correctly
-    ignore: [],
+    // Note: ignore is handled automatically by Vite plugin
+    // AutoUnpackNativesPlugin handles native modules
   },
   rebuildConfig: {},
   makers: [
-    // Windows Installer (Squirrel.Windows)
-    // Installs to: %LocalAppData%\TaxYatra by default
-    // For Program Files, user must run installer as admin
+    // Windows Installer (WiX MSI)
+    // WiX provides a professional MSI installer with:
+    // - Installation location selection dialog
+    // - Automatic detection of existing installations
+    // - Proper uninstall/upgrade handling
+    // - Start menu shortcuts
+    new MakerWix({
+      name: 'TaxYatra',
+      description: 'Tax Return Management Application',
+      manufacturer: 'anshuman2121',
+      exe: 'TaxYatra.exe',
+      
+      // UI Configuration - Enable installer wizard with directory selection
+      ui: {
+        chooseDirectory: true,  // Allow user to choose installation directory
+        images: {
+          // Optional: Customize installer appearance
+          // background: './build/installer-background.png',  // 493x312 px
+          // banner: './build/installer-banner.png',  // 493x58 px
+        }
+      },
+      
+      // Icons - Must be absolute path to .ico file
+      icon: './build/icon.ico',
+      
+      // Installation options
+      defaultInstallMode: 'perUser',  // Per-user installation (set to 'perMachine' for all users)
+      
+      // Shortcuts
+      shortcutFolderName: 'TaxYatra',
+      shortcutName: 'TaxYatra',
+      
+      // Program Files folder name
+      programFilesFolderName: 'TaxYatra',
+      
+      // Upgrade behavior - IMPORTANT: Keep the same upgradeCode for all versions
+      // This allows WiX to detect existing installations and offer upgrade/uninstall
+      upgradeCode: '3F8B6C1E-2D4A-4F3B-9A1E-7C8D5E2F6A3B',
+      
+      // Features
+      features: {
+        autoUpdate: false,
+        autoLaunch: false,  // Don't auto-launch on startup
+      },
+      
+      // Architecture
+      arch: 'x64',
+      
+      // Signing (optional - uncomment if you have a code signing certificate)
+      // windowsSign: {
+      //   certificateFile: './path/to/certificate.pfx',
+      //   certificatePassword: 'your-password',
+      // },
+    }, ['win32']),
+    
+    // Also keep Squirrel as alternative (simpler, auto-update capable)
     new MakerSquirrel({
       name: 'TaxYatra',
       authors: 'anshuman2121',
@@ -47,8 +99,8 @@ const config: ForgeConfig = {
       setupIcon: './build/icon.ico',
       iconUrl: 'https://raw.githubusercontent.com/Anshuman2121/taxyatra/main/build/icon.ico',
       loadingGif: './build/install-spinner.gif',
-      setupExe: 'TaxYatra-Setup.exe',
-      noMsi: true  // Use .exe installer, not MSI
+      setupExe: 'TaxYatra-Squirrel-Setup.exe',
+      noMsi: true
     }, ['win32']),
     
     // Also create a ZIP for portable version

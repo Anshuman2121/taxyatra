@@ -1,34 +1,88 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 
 @theme {
-  --color-background: 0 0% 100%;
+  /* Fonts */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Colors - Standard Slate Neutrals */
+  --color-background: 210 40% 98%;
+  /* Slate 50 */
   --color-foreground: 222.2 84% 4.9%;
+  /* Slate 950 */
+
   --color-card: 0 0% 100%;
   --color-card-foreground: 222.2 84% 4.9%;
+
   --color-popover: 0 0% 100%;
   --color-popover-foreground: 222.2 84% 4.9%;
+
   --color-primary: 222.2 47.4% 11.2%;
+  /* Slate 900 */
   --color-primary-foreground: 210 40% 98%;
-  --color-secondary: 210 40% 96%;
+
+  --color-secondary: 210 40% 96.1%;
+  /* Slate 100 */
   --color-secondary-foreground: 222.2 47.4% 11.2%;
-  --color-muted: 210 40% 96%;
+
+  --color-muted: 210 40% 96.1%;
   --color-muted-foreground: 215.4 16.3% 46.9%;
-  --color-accent: 210 40% 96%;
+
+  --color-accent: 210 40% 96.1%;
   --color-accent-foreground: 222.2 47.4% 11.2%;
+
   --color-destructive: 0 84.2% 60.2%;
   --color-destructive-foreground: 210 40% 98%;
-  --color-border: 214.3 31.8% 91.4%;
+
+  /* Golden Accent Palette */
+  --color-gold-50: #fbf7e6;
+  --color-gold-100: #f5ecc3;
+  --color-gold-200: #eedc90;
+  --color-gold-300: #e5c85d;
+  --color-gold-400: #d4af37;
+  /* Standard Gold */
+  --color-gold-500: #b89225;
+  --color-gold-600: #96701b;
+  --color-gold-700: #785618;
+  --color-gold-800: #63461a;
+  --color-gold-900: #553b1b;
+  --color-gold-950: #31200b;
+
+  /* Semantic mappings for Gold */
+  --color-border: #d4af37;
+  /* Gold 400 */
   --color-input: 214.3 31.8% 91.4%;
-  --color-ring: 222.2 84% 4.9%;
+  --color-ring: #d4af37;
+  /* Gold 400 */
+
   --radius: 0.5rem;
 }
 
 @layer base {
   * {
-    border-color: theme(colors.border);
+    border-color: var(--color-border);
   }
+
   body {
     background-color: theme(colors.background);
     color: theme(colors.foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Standard Golden Headings */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Utility class for golden heading backgrounds if needed specifically */
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, var(--color-gold-300), var(--color-gold-500));
   }
 }

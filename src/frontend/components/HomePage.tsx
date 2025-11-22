@@ -16,25 +16,26 @@ interface HomePageProps {
   refreshTrigger?: number;
 }
 
-interface PanCredential {
-  pan: string;
-  created_at: string;
-}
-
 export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
-  const [panCredentials, setPanCredentials] = useState<PanCredential[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadCredentials();
+    loadUsers();
   }, [refreshTrigger]);
 
-  const loadCredentials = async () => {
+  const loadUsers = async () => {
     try {
-      const credentials = await api.getPanCredentials();
-      setPanCredentials(credentials);
+      setIsLoading(true);
+      const result = await api.getAllUsers();
+      if (result.success && result.data) {
+        setUsers(result.data);
+      }
     } catch (error) {
-      console.error('Error loading PAN credentials:', error);
+      console.error('Error loading users:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -60,6 +61,11 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
     const selectedPan = Array.from(selectedUsers)[0];
     onNavigate('add-user', selectedPan);
   };
+
+  const handleRowDoubleClick = (pan: string) => {
+    onNavigate('user-details', pan);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 relative overflow-hidden">
       <TopNavBar pageName="Inventory" />
@@ -73,43 +79,59 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
       <div className="relative z-10 h-screen flex flex-col">
         {/* Middle Area - expanded to fill space */}
         <div className="flex-1 pt-16 sm:pt-20 md:pt-24 pb-4 px-3 sm:px-4 md:px-6">
-          <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-200/50 p-6 sm:p-8 shadow-xl max-w-6xl mx-auto">
-            <div className="bg-white/80 rounded-lg border border-gray-300/50 overflow-hidden">
+          <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-200/50 p-6 sm:p-8 shadow-xl max-w-6xl mx-auto h-full flex flex-col">
+            <div className="bg-white/80 rounded-lg border border-gray-300/50 overflow-hidden flex-1 overflow-y-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                   <TableRow className="border-b border-gray-300/50">
-                    <TableHead className="border-r border-gray-300/50 w-12">
+                    <TableHead className="border-r border-gray-300/50 w-12 text-center">
                       <input type="checkbox" className="rounded border-gray-300" />
                     </TableHead>
-                    <TableHead className="border-r border-gray-300/50">#</TableHead>
+                    <TableHead className="border-r border-gray-300/50 w-12 text-center">#</TableHead>
                     <TableHead className="border-r border-gray-300/50">Name</TableHead>
-                    <TableHead className="border-r border-gray-300/50">Status</TableHead>
                     <TableHead className="border-r border-gray-300/50">PAN</TableHead>
+                    <TableHead className="border-r border-gray-300/50">Status</TableHead>
+                    <TableHead className="border-r border-gray-300/50">Mobile</TableHead>
                     <TableHead className="border-r border-gray-300/50">Return Filed</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead className="text-center">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {panCredentials.length > 0 ? (
-                    panCredentials.map((credential, index) => (
-                      <TableRow key={credential.pan} className="border-b border-gray-300/50">
-                        <TableCell className="border-r border-gray-300/50">
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        Loading users...
+                      </TableCell>
+                    </TableRow>
+                  ) : users.length > 0 ? (
+                    users.map((user, index) => (
+                      <TableRow
+                        key={user.pan}
+                        className="border-b border-gray-300/50 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                        onDoubleClick={() => handleRowDoubleClick(user.pan)}
+                      >
+                        <TableCell className="border-r border-gray-300/50 text-center" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             className="rounded border-gray-300"
-                            checked={selectedUsers.has(credential.pan)}
-                            onChange={(e) => handleUserSelection(credential.pan, e.target.checked)}
+                            checked={selectedUsers.has(user.pan)}
+                            onChange={(e) => handleUserSelection(user.pan, e.target.checked)}
                           />
                         </TableCell>
-                        <TableCell className="border-r border-gray-300/50">{index + 1}</TableCell>
-                        <TableCell className="border-r border-gray-300/50">User {index + 1}</TableCell>
-                        <TableCell className="border-r border-gray-300/50">Active</TableCell>
-                        <TableCell className="border-r border-gray-300/50">{credential.pan}</TableCell>
-                        <TableCell className="border-r border-gray-300/50">N</TableCell>
-                        <TableCell>
+                        <TableCell className="border-r border-gray-300/50 text-center">{index + 1}</TableCell>
+                        <TableCell className="border-r border-gray-300/50 font-medium text-slate-700">{user.fullName || user.firstName}</TableCell>
+                        <TableCell className="border-r border-gray-300/50 font-mono text-xs">{user.pan}</TableCell>
+                        <TableCell className="border-r border-gray-300/50">
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${user.panStatus === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {user.panStatus}
+                          </span>
+                        </TableCell>
+                        <TableCell className="border-r border-gray-300/50 text-sm">{user.mobileNo}</TableCell>
+                        <TableCell className="border-r border-gray-300/50 text-center">N</TableCell>
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => onNavigate('add-user', credential.pan)}
-                            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors"
+                            onClick={() => onNavigate('user-details', user.pan)}
+                            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors shadow-sm"
                           >
                             View
                           </button>
@@ -118,8 +140,8 @@ export function HomePage({ onNavigate, refreshTrigger }: HomePageProps) {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-gray-700/70 py-8">
-                        No data available
+                      <TableCell colSpan={8} className="text-center text-gray-700/70 py-8">
+                        No users found. Click "Add User" to fetch data.
                       </TableCell>
                     </TableRow>
                   )}

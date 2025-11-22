@@ -5,8 +5,8 @@ import { ITRRepository } from '../database/repositories/itr.repository';
 import { getDatabase, isDatabaseOpen } from '../database/connection';
 
 export function registerUserHandlers() {
-    ipcMain.handle('fetch-user-profile', async (event, pan: string, password: string) => {
-        console.log('🚀 [User Controller] Fetch started for PAN:', pan);
+    ipcMain.handle('fetch-user-profile', async (event, pan: string, password: string, save: boolean = true) => {
+        console.log('🚀 [User Controller] Fetch started for PAN:', pan, 'Save:', save);
         try {
             const sendProgress = (status: string) => {
                 event.sender.send('fetch-progress', status);
@@ -53,28 +53,36 @@ export function registerUserHandlers() {
                             const ITRApiService = (await import('../services/api')).default;
                             const prefillData = await ITRApiService.fetchAllUserData(pan, password, result.cookies);
 
-                            sendProgress('💾 Saving data to database...');
                             // Extract assessment year from prefill data or use default
                             const assessmentYear = prefillData.filingStatus?.assessmentYear || '2025';
 
-                            // Check database state before saving
-                            if (!isDatabaseOpen()) {
-                                console.error('❌ [User Controller] Database is closed or closing');
-                                return { success: false, message: 'Database is not available' };
-                            }
+                            let returnId = null;
 
-                            // Save to database using ITR repository
-                            const db = getDatabase();
-                            if (!db) {
-                                console.error('❌ [User Controller] Database not initialized');
-                                return { success: false, message: 'Database not initialized' };
-                            }
-                            
-                            const itrRepository = new ITRRepository(db);
-                            const returnId = await itrRepository.savePrefillData(pan, assessmentYear, prefillData);
+                            if (save) {
+                                sendProgress('💾 Saving data to database...');
 
-                            sendProgress('✅ Profile data saved successfully!');
-                            console.log('🎉 [User Controller] Complete - Return ID:', returnId);
+                                // Check database state before saving
+                                if (!isDatabaseOpen()) {
+                                    console.error('❌ [User Controller] Database is closed or closing');
+                                    return { success: false, message: 'Database is not available' };
+                                }
+
+                                // Save to database using ITR repository
+                                const db = getDatabase();
+                                if (!db) {
+                                    console.error('❌ [User Controller] Database not initialized');
+                                    return { success: false, message: 'Database not initialized' };
+                                }
+
+                                const itrRepository = new ITRRepository(db);
+                                returnId = await itrRepository.savePrefillData(pan, assessmentYear, prefillData);
+
+                                sendProgress('✅ Profile data saved successfully!');
+                                console.log('🎉 [User Controller] Complete - Return ID:', returnId);
+                            } else {
+                                sendProgress('✅ Profile data fetched (Preview Mode)');
+                                console.log('🎉 [User Controller] Fetch Complete (Preview Mode)');
+                            }
 
                             // Logout to clean up session
                             try {
@@ -90,7 +98,7 @@ export function registerUserHandlers() {
                                 success: true,
                                 data: prefillData,
                                 returnId: returnId,
-                                message: `Data saved for AY ${assessmentYear}`
+                                message: save ? `Data saved for AY ${assessmentYear}` : 'Data fetched successfully'
                             };
                         } catch (apiError: any) {
                             console.error('❌ [User Controller] Error:', apiError.message);
@@ -129,21 +137,9 @@ export function registerUserHandlers() {
     ipcMain.handle('get-user-data', async (event, pan: string) => {
         console.log('🔍 [User Controller] Fetching stored data for PAN:', pan);
         try {
-            if (!isDatabaseOpen()) {
-                console.log('⚠️  [User Controller] Database is closed or closing');
-                return { success: false, message: 'Database is not available' };
-            }
-            
-            const db = getDatabase();
-            if (!db) {
-                console.error('❌ [User Controller] Database not initialized');
-                return { success: false, message: 'Database not initialized' };
-            }
-            
-            const itrRepository = new ITRRepository(db);
-            const userData = await itrRepository.getUserData(pan);
+            const userData = await userDataService.getUserData(pan);
 
-            if (userData) {
+            if (userData && userData.user) {
                 console.log('✅ [User Controller] Data found for PAN:', pan);
                 return { success: true, data: userData };
             } else {
@@ -152,6 +148,92 @@ export function registerUserHandlers() {
             }
         } catch (error: any) {
             console.error('❌ [User Controller] Error fetching stored data:', error.message);
+            return { success: false, message: error.message };
+        }
+    });
+
+    ipcMain.handle('get-all-users', async () => {
+        console.log('🔍 [User Controller] Fetching all users');
+        try {
+            const users = await userDataService.getAllUsers();
+            return { success: true, data: users };
+        } catch (error: any) {
+            console.error('❌ [User Controller] Error fetching all users:', error.message);
+            return { success: false, message: error.message };
+        }
+    });
+
+    ipcMain.handle('save-fetched-profile', async (event, data: any) => {
+        console.log('💾 [User Controller] Saving fetched profile data for PAN:', data.pan);
+        try {
+            const sendProgress = (status: string) => {
+                event.sender.send('fetch-progress', status);
+            };
+
+            if (!isDatabaseOpen()) {
+                return { success: false, message: 'Database is not available' };
+            }
+
+            const db = getDatabase();
+            if (!db) {
+                return { success: false, message: 'Database not initialized' };
+            }
+
+            sendProgress('💾 Saving data to database...');
+
+            // We need to use ITRRepository to save the prefill data structure
+            const itrRepository = new ITRRepository(db);
+
+            // Extract assessment year or default
+            const assessmentYear = data.filingStatus?.assessmentYear || '2025';
+
+            const returnId = await itrRepository.savePrefillData(data.pan, assessmentYear, data);
+
+            sendProgress('✅ Profile data saved successfully!');
+            console.log('🎉 [User Controller] Save Complete - Return ID:', returnId);
+
+            return { success: true, message: 'Data saved successfully', returnId };
+        } catch (error: any) {
+            console.error('❌ [User Controller] Error saving fetched data:', error.message);
+            return { success: false, message: error.message };
+        }
+    });
+
+    ipcMain.handle('update-user-details', async (event, data: any) => {
+        console.log('📝 [User Controller] Updating user details for PAN:', data.pan);
+        try {
+            // We need to implement update logic. 
+            // Since we moved to ITRRepository for saving, we should ideally use that or UserModel.
+            // But ITRRepository expects a specific structure (PrefillData).
+            // For manual edits, we might receive a flatter structure.
+            // Let's use UserModel directly for manual updates as it handles partial updates better.
+
+            const db = getDatabase();
+            if (!db) {
+                return { success: false, message: 'Database not initialized' };
+            }
+
+            const { UserModel } = await import('../database/repositories/user.repository');
+            const userModel = new UserModel(db);
+
+            // Save User (Person + Address)
+            if (data.user) {
+                await userModel.saveUser(data.user);
+            }
+
+            // Save Bank Accounts
+            if (data.bankAccounts) {
+                await userModel.saveBankAccounts(data.pan, data.bankAccounts);
+            }
+
+            // Save Jurisdiction
+            if (data.jurisdiction) {
+                await userModel.saveJurisdiction(data.jurisdiction);
+            }
+
+            return { success: true, message: 'User details updated successfully' };
+        } catch (error: any) {
+            console.error('❌ [User Controller] Error updating user details:', error.message);
             return { success: false, message: error.message };
         }
     });

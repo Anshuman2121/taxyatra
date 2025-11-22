@@ -1,61 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import RegistrationPage from './RegistrationPage';
+import { Loader2 } from 'lucide-react';
 import { HomePage } from './components/HomePage';
 import { AddUserPage } from './components/AddUserPage';
+import { UserDetailsPage } from './components/UserDetailsPage';
 
 function App() {
-  const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
-  const [currentPage, setCurrentPage] = useState('home');
-  const [selectedPan, setSelectedPan] = useState<string | undefined>();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRegistered, setIsRegistered] = useState<boolean | null>(null); // null = loading
+  const [checking, setChecking] = useState(true);
 
-  useEffect(() => {
-    checkRegistration();
-  }, []);
-
-  const checkRegistration = async () => {
+  const checkRegistrationStatus = async () => {
     try {
       const result = await window.electronAPI.checkRegistration();
       setIsRegistered(result.registered);
     } catch (error) {
-      console.error('Failed to check registration:', error);
+      console.error("Failed to check registration:", error);
       setIsRegistered(false);
+    } finally {
+      setChecking(false);
     }
   };
 
-  const handleNavigation = (page: string, pan?: string) => {
+  const [currentPage, setCurrentPage] = useState('home');
+  const [selectedPan, setSelectedPan] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    checkRegistrationStatus();
+  }, []);
+
+  const handleRegistrationSuccess = () => {
+    setIsRegistered(true);
+  };
+
+  const handleNavigate = (page: string, pan?: string) => {
     setCurrentPage(page);
     setSelectedPan(pan);
   };
 
-  const handleBack = () => {
-    setCurrentPage('home');
-    setSelectedPan(undefined);
-    setRefreshTrigger(prev => prev + 1);
-  };
-
-  if (isRegistered === null) {
+  if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
       </div>
     );
   }
 
   if (!isRegistered) {
-    return <RegistrationPage onRegistered={() => setIsRegistered(true)} />;
+    return (
+      <RegistrationPage onRegistered={handleRegistrationSuccess} />
+    );
   }
 
   return (
-    <div>
-      {(() => {
-        switch (currentPage) {
-          case 'add-user':
-            return <AddUserPage onBack={handleBack} selectedPan={selectedPan} />;
-          default:
-            return <HomePage onNavigate={handleNavigation} refreshTrigger={refreshTrigger} />;
-        }
-      })()}
+    <div className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-gold-200 selection:text-gold-900">
+      {currentPage === 'home' && (
+        <HomePage onNavigate={handleNavigate} />
+      )}
+      {currentPage === 'add-user' && (
+        <AddUserPage
+          onBack={() => handleNavigate('home')}
+          selectedPan={selectedPan}
+        />
+      )}
+      {currentPage === 'user-details' && selectedPan && (
+        <UserDetailsPage
+          pan={selectedPan}
+          onBack={() => handleNavigate('home')}
+        />
+      )}
     </div>
   );
 }

@@ -118,15 +118,92 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
 
     try {
       const result = await api.fetchUserProfile(pan, password);
-      
+
       if (result.success && result.data) {
-        setUserData(result.data);
+        const data = result.data;
+        setUserData(data);
         setIsComplete(true);
+
+        // Map Personal Info
+        if (data.personalInfo) {
+          const pi = data.personalInfo;
+          const addr = pi.address || {};
+
+          setManualData(prev => ({
+            ...prev,
+            firstName: pi.assesseeName?.firstName || '',
+            middleName: pi.assesseeName?.middleName || '',
+            lastName: pi.assesseeName?.surNameOrOrgName || '',
+            panNumber: pan,
+            status: pi.status || 'Individual',
+            dob: pi.dob || '',
+            birthDate: pi.dob ? new Date(pi.dob).toISOString().split('T')[0] : '',
+            gender: pi.gender || 'M',
+            aadhaarNumber: pi.aadhaarCardNo || '',
+            mobile: addr.mobileNo || '',
+            emailInReturn: addr.emailAddress || '',
+
+            // Address mapping (assuming residence for now)
+            resFlat: addr.addrLine1Txt || '',
+            resBuilding: addr.addrLine2Txt || '',
+            resRoad: addr.addrLine3Txt || '',
+            resArea: addr.addrLine4Txt || '',
+            resCity: addr.city || '',
+            resState: addr.stateCd || '',
+            resPin: addr.pinCd || '',
+            resCountry: addr.countryCode || '91',
+            resPhone: addr.phoneNo || '',
+
+            // Default others
+            residence: 'Resident',
+            // resCountry already set above
+            offCountry: 'India'
+          }));
+        }
+
+        // Map Bank Accounts
+        if (data.bankAccountDtls && Array.isArray(data.bankAccountDtls)) {
+          const mappedAccounts = data.bankAccountDtls.map((acc: any) => ({
+            bankName: acc.bankName || '',
+            branch: acc.bankBrnchTxt || '',
+            accountNumber: acc.bankAcctNum || '',
+            ifsc: acc.ifscCd || '',
+            accountType: acc.accountType || 'Savings',
+            nameAsPerBank: acc.nameAsPerBank || ''
+          }));
+          if (mappedAccounts.length > 0) {
+            setBankAccounts(mappedAccounts);
+          }
+        }
+
+        // Map Jurisdiction (if available in response, otherwise it might be empty)
+        // Note: The API response structure for jurisdiction might vary, assuming it's not in the main prefill object usually
+        // But if we have it:
+        if (data.jurisdiction) {
+          setJurisdiction(prev => ({
+            ...prev,
+            areaCd: data.jurisdiction.areaCd || '',
+            areaDesc: data.jurisdiction.areaDesc || '',
+            aoType: data.jurisdiction.aoType || '',
+            rangeCd: data.jurisdiction.rangeCd || '',
+            aoNo: data.jurisdiction.aoNo || '',
+            aoPplrName: data.jurisdiction.aoPplrName || '',
+            aoEmailId: data.jurisdiction.aoEmailId || '',
+            aoBldgDesc: data.jurisdiction.aoBldgDesc || ''
+          }));
+        }
+
+        // Switch to User Details tab after a short delay
+        setTimeout(() => {
+          setShowProgressModal(false);
+          setSelectedTab('user-details');
+        }, 1000);
+
       } else {
         setUserData({ error: result.message || 'Failed to fetch data' });
         setIsError(true);
       }
-    } catch (error) {
+    } catch (error: any) {
       setUserData({ error: error.message });
       setIsError(true);
     } finally {
@@ -209,8 +286,8 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
                   </div>
                 </div>
 
-                {/* Display API response */}
-                {userData && <PrefillDataDisplay data={userData} />}
+                {/* Display API response - Removed as per user request */}
+                {/* {userData && <PrefillDataDisplay data={userData} />} */}
 
                 <div className="mt-6 p-3 bg-slate-50 border border-yellow-200 rounded-lg">
                   <p className="text-xs text-yellow-800">
@@ -580,7 +657,7 @@ export function AddUserPage({ onBack, selectedPan }: AddUserPageProps) {
       </div>
 
       <BottomBar />
-      
+
       <FetchProgressModal
         isOpen={showProgressModal}
         onClose={handleCloseModal}

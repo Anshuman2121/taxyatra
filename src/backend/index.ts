@@ -13,14 +13,22 @@ if (started) {
 const createWindow = () => {
     // Create the browser window.
     const mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 1200,
+        height: 800,
+        minWidth: 1024,
+        minHeight: 768,
+        show: false, // Don't show until maximized
         icon: path.join(__dirname, '../../build/icon.png'),
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'), // Adjusted path
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
         },
+    });
+
+    mainWindow.maximize();
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
     });
 
     // and load the index.html of the app.
@@ -35,7 +43,7 @@ const createWindow = () => {
     // Open the DevTools only in development.
     if (process.env.NODE_ENV === 'development') {
         mainWindow.webContents.openDevTools();
-        
+
         // Suppress autofill console errors
         mainWindow.webContents.on('console-message', (event, level, message) => {
             if (message.includes('Autofill.enable') || message.includes('Autofill.setAddresses')) {
