@@ -29,9 +29,35 @@ npm start
 ```
 
 ### Build for Production
+
+You can build the app for specific platforms or all at once.
+
+**Build for All Platforms:**
 ```bash
-npm run make
+npm run dist:all
 ```
+
+**Build for Windows:**
+```bash
+npm run dist:win
+```
+
+**Build for Mac:**
+```bash
+npm run dist:mac
+```
+
+**Build for Linux:**
+```bash
+npm run dist:linux
+```
+
+### Where are the files?
+After the build completes, go to the `dist_electron` folder in your project directory.
+
+- **Windows:** You will find the `.exe` installer here (e.g., `TaxYatra Setup 1.0.0.exe`).
+- **Mac:** You will find the `.dmg` file here (e.g., `TaxYatra-1.0.0.dmg`).
+- **Linux:** You will find `.AppImage` and `.deb` files here.
 
 ## One-Line Setup (Future Reference)
 ```bash
@@ -39,40 +65,3 @@ npx create-electron-app@latest taxyatra --template=vite-typescript && cd taxyatr
 ```
 
 
-### To build
-
-npm run dist:win
-npm run dist:mac
-
-npm run dist:all
-
-
-choco install wixtoolset
-npm run make:win-msi
-
-### Fixing Windows ARM64 Build Warning
-
-If you see this warning when building on Windows ARM64:
-```
-Unable to extract icon from exe. Please provide an explicit icon via parameter.
-Error: Cannot find module '@bitdisaster/exe-icon-extractor'
-```
-
-**To fix it permanently:**
-
-1. Open **Visual Studio Installer** on your Windows VM
-2. Click **Modify** on your Visual Studio 2022 Build Tools
-3. Go to the **Individual components** tab
-4. Search for and check:
-   - `C++ Clang Compiler for Windows`
-   - `C++ Clang-cl for v143 build tools (ARM64)`
-   - `MSBuild support for LLVM (clang-cl) toolset`
-5. Click **Modify** to install
-6. After installation, in your project directory run:
-   ```cmd
-   rmdir /s /q node_modules
-   del package-lock.json
-   npm install
-   ```
-
-The warning occurs because `@bitdisaster/exe-icon-extractor` (an optional dependency) requires ClangCL to compile on ARM64. Once installed, the warning will disappear and all builds will complete silently.

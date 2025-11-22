@@ -5,6 +5,10 @@ import { initDatabase, closeDatabase } from './database/connection';
 import userDataService from './services/userDataService';
 import { registerIpcHandlers } from './controllers/index';
 
+// Declare Vite globals (only available in development)
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
+
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
     app.quit();
@@ -20,7 +24,7 @@ const createWindow = () => {
         show: false, // Don't show until maximized
         icon: path.join(__dirname, '../../build/icon.png'),
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, '../preload/preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
         },
@@ -32,25 +36,47 @@ const createWindow = () => {
     });
 
     // and load the index.html of the app.
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-        mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('Is development:', process.env.NODE_ENV === 'development');
+
+    if (process.env.NODE_ENV === 'development') {
+        // In development, use Vite dev server
+        const devServerUrl = 'http://localhost:5173';
+        console.log('Loading from Vite dev server:', devServerUrl);
+        mainWindow.loadURL(devServerUrl);
     } else {
-        mainWindow.loadFile(
-            path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-        );
+        // In production, load from built files
+        const prodPath = path.join(__dirname, '../renderer/index.html');
+        console.log('Loading from production build:', prodPath);
+        mainWindow.loadFile(prodPath);
     }
 
     // Open the DevTools only in development.
+    // Open the DevTools only in development.
     if (process.env.NODE_ENV === 'development') {
         mainWindow.webContents.openDevTools();
+    }
 
-        // Suppress autofill console errors
-        mainWindow.webContents.on('console-message', (event, level, message) => {
-            if (message.includes('Autofill.enable') || message.includes('Autofill.setAddresses')) {
-                event.preventDefault();
+    // Set Content Security Policy
+    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+            responseHeaders: {
+                ...details.responseHeaders,
+                'Content-Security-Policy': [
+                    process.env.NODE_ENV === 'development'
+                        ? "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-eval' 'unsafe-inline' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:;"
+                        : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:;"
+                ]
             }
         });
-    }
+    });
+
+    // Suppress autofill console errors
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+        if (message.includes('Autofill.enable') || message.includes('Autofill.setAddresses')) {
+            event.preventDefault();
+        }
+    });
 };
 
 // This method will be called when Electron has finished
