@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { Browser, Page } from 'puppeteer';
+// import { Browser, Page } from 'puppeteer';
 
 puppeteer.use(StealthPlugin());
 
@@ -13,6 +13,7 @@ export class PuppeteerService {
         this.abortController = new AbortController();
 
         onProgress?.('Starting browser...');
+
         const browser = await puppeteer.launch({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
