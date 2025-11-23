@@ -13,8 +13,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFetchedProfile: (data: any) => ipcRenderer.invoke('save-fetched-profile', data),
   getUserData: (pan: string) => ipcRenderer.invoke('get-user-data', pan),
   getAllUsers: () => ipcRenderer.invoke('get-all-users'),
+  deleteUser: (pan: string) => ipcRenderer.invoke('delete-user', pan),
   updateUserDetails: (data: any) => ipcRenderer.invoke('update-user-details', data),
   onFetchProgress: (callback: (event: any, status: string) => void) => ipcRenderer.on('fetch-progress', callback),
+  removeAllFetchProgressListeners: () => ipcRenderer.removeAllListeners('fetch-progress'),
   // Registration API
   checkRegistration: () => ipcRenderer.invoke('registration:check'),
   submitRegistration: (licenseKey: string) => ipcRenderer.invoke('registration:submit', licenseKey),

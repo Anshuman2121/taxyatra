@@ -20,10 +20,19 @@ const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
 
     // Helper to compare values and highlight changes
     const renderComparison = (label: string, oldVal: any, newVal: any) => {
-        const isDifferent = JSON.stringify(oldVal) !== JSON.stringify(newVal);
+        // Normalize values for comparison
+        const normalize = (val: any) => {
+            if (val === null || val === undefined) return '';
+            return String(val).trim();
+        };
+
+        const nOld = normalize(oldVal);
+        const nNew = normalize(newVal);
+
+        const isDifferent = nOld !== nNew;
 
         // If both are empty/null, don't show
-        if (!oldVal && !newVal) return null;
+        if (!nOld && !nNew) return null;
 
         return (
             <div className="grid grid-cols-3 gap-4 py-2 border-b border-slate-100 text-sm">
@@ -36,42 +45,28 @@ const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
         );
     };
 
-    // Extract relevant fields for comparison
+    // Extract relevant fields for comparison from normalized form data
     const getPersonalInfo = (data: any) => {
-        if (!data) return {};
-        // Handle both structure types (DB vs API)
-        // DB structure: user object
-        // API structure: personalInfo object
+        if (!data || !data.manualData) return {};
+        const md = data.manualData;
 
-        if (data.user) {
-            return {
-                name: data.user.fullName,
-                dob: data.user.dob,
-                mobile: data.user.mobileNo,
-                email: data.user.email,
-                aadhaar: data.user.aadhaarNum,
-                address: `${data.user.addrLine1Txt || ''} ${data.user.addrLine2Txt || ''} ${data.user.addrLine3Txt || ''} ${data.user.addrLine4Txt || ''} ${data.user.stateCd || ''} ${data.user.pinCd || ''}`.trim()
-            };
-        } else if (data.personalInfo) {
-            const pi = data.personalInfo;
-            const addr = pi.address || {};
-            return {
-                name: `${pi.assesseeName?.firstName || ''} ${pi.assesseeName?.middleName || ''} ${pi.assesseeName?.surNameOrOrgName || ''}`.trim(),
-                dob: pi.dob,
-                mobile: addr.mobileNo,
-                email: addr.emailAddress,
-                aadhaar: pi.aadhaarCardNo,
-                address: `${addr.addrLine1Txt || ''} ${addr.addrLine2Txt || ''} ${addr.addrLine3Txt || ''} ${addr.addrLine4Txt || ''} ${addr.stateCd || ''} ${addr.pinCd || ''}`.trim()
-            };
-        }
-        return {};
+        return {
+            'Full Name': `${md.firstName || ''} ${md.middleName || ''} ${md.lastName || ''}`.trim(),
+            'Date of Birth': md.dob || md.birthDate,
+            'Mobile': md.mobile,
+            'Email': md.emailInReturn,
+            'Aadhaar': md.aadhaarNumber,
+            'Address': `${md.resFlat || ''} ${md.resBuilding || ''} ${md.resRoad || ''} ${md.resArea || ''} ${md.resCity || ''} ${md.resState || ''} ${md.resPin || ''}`.trim(),
+            'Status': md.status,
+            'Gender': md.gender
+        };
     };
 
     const oldInfo = getPersonalInfo(currentData);
     const newInfo = getPersonalInfo(newData);
 
     const oldBanks = currentData?.bankAccounts?.length || 0;
-    const newBanks = newData?.bankAccountDtls?.length || 0;
+    const newBanks = newData?.bankAccounts?.length || 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -99,13 +94,12 @@ const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                        {renderComparison('Full Name', oldInfo.name, newInfo.name)}
-                        {renderComparison('Date of Birth', oldInfo.dob, newInfo.dob)}
-                        {renderComparison('Mobile', oldInfo.mobile, newInfo.mobile)}
-                        {renderComparison('Email', oldInfo.email, newInfo.email)}
-                        {renderComparison('Aadhaar', oldInfo.aadhaar, newInfo.aadhaar)}
-                        {renderComparison('Address', oldInfo.address, newInfo.address)}
-                        {renderComparison('Bank Accounts', `${oldBanks} Accounts`, `${newBanks} Accounts`)}
+                        <div className="space-y-1">
+                            {Object.keys(newInfo).map(key => (
+                                renderComparison(key, oldInfo[key as keyof typeof oldInfo], newInfo[key as keyof typeof newInfo])
+                            ))}
+                            {renderComparison('Bank Accounts', `${oldBanks} Accounts`, `${newBanks} Accounts`)}
+                        </div>
                     </div>
 
                     <div className="mt-6 p-4 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-800">

@@ -122,6 +122,17 @@ class UserDataService {
       throw error;
     }
   }
+
+  async deleteUser(pan: string): Promise<void> {
+    try {
+      const userModel = this.ensureUserModel();
+      await userModel.deleteUser(pan);
+      console.log(`✅ User ${pan} deleted successfully`);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  }
 }
 
 export default new UserDataService();

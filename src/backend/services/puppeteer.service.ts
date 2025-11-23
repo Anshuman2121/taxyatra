@@ -42,12 +42,46 @@ export class PuppeteerService {
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             if (this.abortController.signal.aborted) throw new Error('Cancelled');
+            // Setup response listener before clicking to capture PAN validation details
+            const validationResponsePromise = page.waitForResponse(async (res): Promise<boolean> => {
+                try {
+                    const req = res.request();
+                    if (req.method() !== 'POST') return false;
+                    const text = await res.text();
+                    return text.includes('"entityType":"PAN"') || text.includes('"entityType": "PAN"');
+                } catch (e) {
+                    return false;
+                }
+            }, { timeout: 8000 }).catch((): any => null); // Catch timeout and return null
+
             onProgress?.('Clicking Continue...');
             await page.evaluate(() => {
                 const btns = Array.from(document.querySelectorAll('button'));
                 const continueBtn = btns.find(b => b.textContent?.includes('Continue'));
                 if (continueBtn) continueBtn.click();
             });
+
+            // Check the validation response
+            const validationResponse = await validationResponsePromise;
+            if (validationResponse) {
+                try {
+                    const data = await validationResponse.json();
+                    console.log('🔎 [Puppeteer] PAN Validation Response:', JSON.stringify(data));
+
+                    if (data.secLoginOptions && data.secLoginOptions.trim() !== '') {
+                        console.error(`❌ [Puppeteer] Security option enabled: ${data.secLoginOptions}`);
+                        throw new Error(`Cannot able to fetch profile: ${data.secLoginOptions} is enabled. Remove this first to use`);
+                    }
+                } catch (e: any) {
+                    // Rethrow our specific error
+                    if (e.message && e.message.includes('Cannot able to fetch profile')) {
+                        throw e;
+                    }
+                    console.log('⚠️ [Puppeteer] Error parsing validation response:', e.message);
+                }
+            } else {
+                console.log('⚠️ [Puppeteer] Validation response not captured (timeout), proceeding...');
+            }
 
             await new Promise(resolve => setTimeout(resolve, 4000));
 

@@ -237,4 +237,15 @@ export function registerUserHandlers() {
             return { success: false, message: error.message };
         }
     });
+
+    ipcMain.handle('delete-user', async (event, pan: string) => {
+        console.log('🗑️ [User Controller] Deleting user:', pan);
+        try {
+            await userDataService.deleteUser(pan);
+            return { success: true, message: 'User deleted successfully' };
+        } catch (error: any) {
+            console.error('❌ [User Controller] Error deleting user:', error.message);
+            return { success: false, message: error.message };
+        }
+    });
 }
