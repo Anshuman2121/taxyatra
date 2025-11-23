@@ -1,1 +1,328 @@
-{"personalInfo":{"fatherName":"LUCHE JHA","orgFirmInfo":{"AssesseeName":{"SurNameOrOrgName":"CHOUDHARY"},"DateOFFormOrIncorp":"1936-01-02","StatusOrCompanyType":"IND"},"address":{"zipCode":"","localityOrArea":"muzaffarpur","residenceNo":"vidyapati nagar","cityOrTownOrDistrict":"","mobileNo":9934646721,"emailAddressSecondary":"","emailAddress":"rohitkrishnajha@rediffmail.com","countryCodeMobile":91,"phone":{},"countryCode":"","roadOrStreet":"ramna","pinCode":842002,"stateCode":"05","residenceName":"mehta compound"},"assesseeName":{"firstName":"PAN","surNameOrOrgName":"CHOUDHARY"},"portugeseCC5A":"","assesseeVerName":"PAN CHOUDHARY","capacity":"S","filingStatus":{"residentialStatus":""},"assesseVerPan":"ABTPC3954F","dob":"1936-01-02","aadhaarCardNo":"NzY3NzE4MzQxMTM3","pan":"ABTPC3954F","status":"I"},"Form10BC":null,"orgFirmInfo":null,"Form10BA":null,"form10DA":null,"form3CD":{"PartAOI":{"ScheduleTPSAFlg":"N","Amount":0}},"scheduleAL":null,"form3CE":null,"form26as":{"taxPayments":{"taxPayment":[{"srlNoOfChaln":21015,"dateDep":"2025-08-13","bsrCode":"0510002","nameOfBankAndBranch":{"nameOfBank":"HDFC BANK","nameOfBranch":"NARIMAN POINT"},"amt":2780,"receiptNumber":"05100021308202521015"}]},"tdsOnOthThanSals":{"tdSonOthThanSal":[{"taxDeductCreditDtls":{"taxClaimedOwnHands":1136,"taxDeductedOwnHands":1136},"TDSCreditName":"S","sectionCode":"94K","grossAmount":8506,"headOfIncome":"CG","employerOrDeductorOrCollectDetl":{"tan":"CHES06353E","employerOrDeductorOrCollecterName":"SUNDARAM MUTUAL FUND"}},{"taxDeductCreditDtls":{"taxClaimedOwnHands":18180,"taxDeductedOwnHands":18180},"TDSCreditName":"S","sectionCode":"94K","grossAmount":178509,"headOfIncome":"CG","employerOrDeductorOrCollectDetl":{"tan":"MUMH20074F","employerOrDeductorOrCollecterName":"HDFC MUTUAL FUND - DIVIDENDS"}},{"taxDeductCreditDtls":{"taxClaimedOwnHands":1381,"taxDeductedOwnHands":1381},"TDSCreditName":"S","sectionCode":"94K","grossAmount":13809,"headOfIncome":"CG","employerOrDeductorOrCollectDetl":{"tan":"MUMR14567A","employerOrDeductorOrCollecterName":"NIPPON INDIA MUTUAL FUND"}},{"taxDeductCreditDtls":{"taxClaimedOwnHands":3685,"taxDeductedOwnHands":3685},"TDSCreditName":"S","sectionCode":"94K","grossAmount":32153,"headOfIncome":"CG","employerOrDeductorOrCollectDetl":{"tan":"MUMP16274G","employerOrDeductorOrCollecterName":"ICICI PRUDENTIAL MUTUAL FUND"}},{"taxDeductCreditDtls":{"taxClaimedOwnHands":1855,"taxDeductedOwnHands":1855},"TDSCreditName":"S","sectionCode":"94K","grossAmount":18548,"headOfIncome":"CG","employerOrDeductorOrCollectDetl":{"tan":"MUMD05871F","employerOrDeductorOrCollecterName":"DSP MUTUAL FUND"}}]},"scheduleOS":{"incOthThanOwnRaceHorse":{"dividendGross":301218,"DividendOthThan22e":301218}},"persumptiveInc44ADA":{"grsReceipt":0},"incomeDeductionsOthersInc":[{"othSrcOthAmount":301218,"othSrcNatureDesc":"DIV"},{"othSrcOthAmount":160901,"othSrcNatureDesc":"SAV"},{"othSrcOthAmount":42867,"othSrcNatureDesc":"IFD"}],"intrstFrmTermDeposit":42867},"form10IBICID":null,"otherSourceIncome":null,"form10IE":null,"form10CCE":null,"form10CCF":null,"form10CCD":null,"itba":null,"form64D":null,"verification":{"declaration":{"fatherName":"LUCHE JHA","assesseeVerPAN":"ABTPC3954F","assesseeVerName":"PAN CHOUDHARY"},"capacity":"S"},"bankAccountDtls":[{"addtnlBankDetails":[{"useForRefund":"true","bankAccountNo":"0294104000074926","bankName":"IDBI BANK LTD","ifsccode":"IBKL0000294","AccountType":"SB"},{"useForRefund":"true","bankAccountNo":"10058125225","bankName":"STATE BANK OF INDIA","ifsccode":"SBIN0008960","AccountType":"SB"}]}],"form56F":null,"insights":{"intrstFrmSavingBank":160901,"scheduleOS":{"incOthThanOwnRaceHorse":{"dividendGross":301218,"DividendOthThan22e":301218}},"intrstFrmTermDeposit":42867,"incomeDeductionsOthersInc":[{"othSrcOthAmount":301218,"othSrcNatureDesc":"DIV"},{"othSrcOthAmount":160901,"othSrcNatureDesc":"SAV"},{"othSrcOthAmount":42867,"othSrcNatureDesc":"IFD"}],"UsrDeductUndChapVIAType":{"Section80TTB":42867}},"form10CCB":null,"form29b":null,"scheduleCFL":{"CarryFwdLossDetail":[]},"filingStatus":{"SeventhProvisio139":"N","OptingNewTaxRegimeForm10IF":2,"receiptNo":"656048380130825","returnFileSec":17,"origRetFiledDate":"2025-08-13"},"form24q":{"usrDeductUndChapVIAType":{},"intrstFrmSavingBank":160901,"isActive":false},"partAGEN2":null,"ScheduleEI":null,"Form10A":null,"Form10IFA":null,"ais":null,"ScheduleESOP":null,"formCCBA":null,"auditInfo":null,"incDeductionsOthIncCPC":[{"itrAy":"2025","othSrcOthAmount":35,"othSrcNatureDesc":"TAX"}],"formCCBD":null,"formCCBC":null,"formCCBB":null,"form67":null,"assesseeRep":null,"form66":null,"form10E":null,"Schedule80RA":null,"Form10IA":null,"Schedule80G":null,"form64A":null,"Form10AB":null,"Form10IEA":null,"form10IF":{"newTaxRegime":"N"},"form10AC":null,"form10BOR10BB":null,"natOfBus":null,"filingReturn":null,"lastFiledITR":{"foreignBankDetails":[],"usrDeductUndChapVIAType":{},"benefitUs115HFlg":"N","schedule80D":{"Sec80DSelfFamSrCtznHealth":{"SeniorCitizenFlag":null,"ParentSeniorCitizenFlag":null}},"assetOutIndiaFlag":"NO","scheduleUD":[],"scheduleSPI":{"specifiedPerson":[]},"scheduleAMTC":{"scheduleAMTCDtls":[{"gross":0,"assYr":"2024-25","amtCreditSetOfEy":0,"amtCreditFwd":0}]},"totalNumOfMonths":0,"scheduleHP":{"propertyDetails":[]},"scheduleTCS":{"tcs":[]},"filingStatus":{"ResidentialStatus":"RES"},"heldUnlistedEqShrPrYrFlg":"N","compDirectorPrvYrFlg":"N","scheduleMATC":{},"schedule5A2014":{}},"form3CEA":null,"form3CEB":null}
+{
+  "personalInfo": {
+    "fatherName": "LUCHE JHA",
+    "orgFirmInfo": {
+      "AssesseeName": {
+        "SurNameOrOrgName": "CHOUDHARY"
+      },
+      "DateOFFormOrIncorp": "1936-01-02",
+      "StatusOrCompanyType": "IND"
+    },
+    "address": {
+      "zipCode": "",
+      "localityOrArea": "muzaffarpur",
+      "residenceNo": "vidyapati nagar",
+      "cityOrTownOrDistrict": "",
+      "mobileNo": 9934646721,
+      "emailAddressSecondary": "",
+      "emailAddress": "rohitkrishnajha@rediffmail.com",
+      "countryCodeMobile": 91,
+      "phone": {},
+      "countryCode": "",
+      "roadOrStreet": "ramna",
+      "pinCode": 842002,
+      "stateCode": "05",
+      "residenceName": "mehta compound"
+    },
+    "assesseeName": {
+      "firstName": "PAN",
+      "surNameOrOrgName": "CHOUDHARY"
+    },
+    "portugeseCC5A": "",
+    "assesseeVerName": "PAN CHOUDHARY",
+    "capacity": "S",
+    "filingStatus": {
+      "residentialStatus": ""
+    },
+    "assesseVerPan": "ABTPC3954F",
+    "dob": "1936-01-02",
+    "aadhaarCardNo": "NzY3NzE4MzQxMTM3",
+    "pan": "ABTPC3954F",
+    "status": "I"
+  },
+  "Form10BC": null,
+  "orgFirmInfo": null,
+  "Form10BA": null,
+  "form10DA": null,
+  "form3CD": {
+    "PartAOI": {
+      "ScheduleTPSAFlg": "N",
+      "Amount": 0
+    }
+  },
+  "scheduleAL": null,
+  "form3CE": null,
+  "form26as": {
+    "taxPayments": {
+      "taxPayment": [
+        {
+          "srlNoOfChaln": 21015,
+          "dateDep": "2025-08-13",
+          "bsrCode": "0510002",
+          "nameOfBankAndBranch": {
+            "nameOfBank": "HDFC BANK",
+            "nameOfBranch": "NARIMAN POINT"
+          },
+          "amt": 2780,
+          "receiptNumber": "05100021308202521015"
+        }
+      ]
+    },
+    "tdsOnOthThanSals": {
+      "tdSonOthThanSal": [
+        {
+          "taxDeductCreditDtls": {
+            "taxClaimedOwnHands": 1136,
+            "taxDeductedOwnHands": 1136
+          },
+          "TDSCreditName": "S",
+          "sectionCode": "94K",
+          "grossAmount": 8506,
+          "headOfIncome": "CG",
+          "employerOrDeductorOrCollectDetl": {
+            "tan": "CHES06353E",
+            "employerOrDeductorOrCollecterName": "SUNDARAM MUTUAL FUND"
+          }
+        },
+        {
+          "taxDeductCreditDtls": {
+            "taxClaimedOwnHands": 18180,
+            "taxDeductedOwnHands": 18180
+          },
+          "TDSCreditName": "S",
+          "sectionCode": "94K",
+          "grossAmount": 178509,
+          "headOfIncome": "CG",
+          "employerOrDeductorOrCollectDetl": {
+            "tan": "MUMH20074F",
+            "employerOrDeductorOrCollecterName": "HDFC MUTUAL FUND - DIVIDENDS"
+          }
+        },
+        {
+          "taxDeductCreditDtls": {
+            "taxClaimedOwnHands": 1381,
+            "taxDeductedOwnHands": 1381
+          },
+          "TDSCreditName": "S",
+          "sectionCode": "94K",
+          "grossAmount": 13809,
+          "headOfIncome": "CG",
+          "employerOrDeductorOrCollectDetl": {
+            "tan": "MUMR14567A",
+            "employerOrDeductorOrCollecterName": "NIPPON INDIA MUTUAL FUND"
+          }
+        },
+        {
+          "taxDeductCreditDtls": {
+            "taxClaimedOwnHands": 3685,
+            "taxDeductedOwnHands": 3685
+          },
+          "TDSCreditName": "S",
+          "sectionCode": "94K",
+          "grossAmount": 32153,
+          "headOfIncome": "CG",
+          "employerOrDeductorOrCollectDetl": {
+            "tan": "MUMP16274G",
+            "employerOrDeductorOrCollecterName": "ICICI PRUDENTIAL MUTUAL FUND"
+          }
+        },
+        {
+          "taxDeductCreditDtls": {
+            "taxClaimedOwnHands": 1855,
+            "taxDeductedOwnHands": 1855
+          },
+          "TDSCreditName": "S",
+          "sectionCode": "94K",
+          "grossAmount": 18548,
+          "headOfIncome": "CG",
+          "employerOrDeductorOrCollectDetl": {
+            "tan": "MUMD05871F",
+            "employerOrDeductorOrCollecterName": "DSP MUTUAL FUND"
+          }
+        }
+      ]
+    },
+    "scheduleOS": {
+      "incOthThanOwnRaceHorse": {
+        "dividendGross": 301218,
+        "DividendOthThan22e": 301218
+      }
+    },
+    "persumptiveInc44ADA": {
+      "grsReceipt": 0
+    },
+    "incomeDeductionsOthersInc": [
+      {
+        "othSrcOthAmount": 301218,
+        "othSrcNatureDesc": "DIV"
+      },
+      {
+        "othSrcOthAmount": 160901,
+        "othSrcNatureDesc": "SAV"
+      },
+      {
+        "othSrcOthAmount": 42867,
+        "othSrcNatureDesc": "IFD"
+      }
+    ],
+    "intrstFrmTermDeposit": 42867
+  },
+  "form10IBICID": null,
+  "otherSourceIncome": null,
+  "form10IE": null,
+  "form10CCE": null,
+  "form10CCF": null,
+  "form10CCD": null,
+  "itba": null,
+  "form64D": null,
+  "verification": {
+    "declaration": {
+      "fatherName": "LUCHE JHA",
+      "assesseeVerPAN": "ABTPC3954F",
+      "assesseeVerName": "PAN CHOUDHARY"
+    },
+    "capacity": "S"
+  },
+  "bankAccountDtls": [
+    {
+      "addtnlBankDetails": [
+        {
+          "useForRefund": "true",
+          "bankAccountNo": "0294104000074926",
+          "bankName": "IDBI BANK LTD",
+          "ifsccode": "IBKL0000294",
+          "AccountType": "SB"
+        },
+        {
+          "useForRefund": "true",
+          "bankAccountNo": "10058125225",
+          "bankName": "STATE BANK OF INDIA",
+          "ifsccode": "SBIN0008960",
+          "AccountType": "SB"
+        }
+      ]
+    }
+  ],
+  "form56F": null,
+  "insights": {
+    "intrstFrmSavingBank": 160901,
+    "scheduleOS": {
+      "incOthThanOwnRaceHorse": {
+        "dividendGross": 301218,
+        "DividendOthThan22e": 301218
+      }
+    },
+    "intrstFrmTermDeposit": 42867,
+    "incomeDeductionsOthersInc": [
+      {
+        "othSrcOthAmount": 301218,
+        "othSrcNatureDesc": "DIV"
+      },
+      {
+        "othSrcOthAmount": 160901,
+        "othSrcNatureDesc": "SAV"
+      },
+      {
+        "othSrcOthAmount": 42867,
+        "othSrcNatureDesc": "IFD"
+      }
+    ],
+    "UsrDeductUndChapVIAType": {
+      "Section80TTB": 42867
+    }
+  },
+  "form10CCB": null,
+  "form29b": null,
+  "scheduleCFL": {
+    "CarryFwdLossDetail": []
+  },
+  "filingStatus": {
+    "SeventhProvisio139": "N",
+    "OptingNewTaxRegimeForm10IF": 2,
+    "receiptNo": "656048380130825",
+    "returnFileSec": 17,
+    "origRetFiledDate": "2025-08-13"
+  },
+  "form24q": {
+    "usrDeductUndChapVIAType": {},
+    "intrstFrmSavingBank": 160901,
+    "isActive": false
+  },
+  "partAGEN2": null,
+  "ScheduleEI": null,
+  "Form10A": null,
+  "Form10IFA": null,
+  "ais": null,
+  "ScheduleESOP": null,
+  "formCCBA": null,
+  "auditInfo": null,
+  "incDeductionsOthIncCPC": [
+    {
+      "itrAy": "2025",
+      "othSrcOthAmount": 35,
+      "othSrcNatureDesc": "TAX"
+    }
+  ],
+  "formCCBD": null,
+  "formCCBC": null,
+  "formCCBB": null,
+  "form67": null,
+  "assesseeRep": null,
+  "form66": null,
+  "form10E": null,
+  "Schedule80RA": null,
+  "Form10IA": null,
+  "Schedule80G": null,
+  "form64A": null,
+  "Form10AB": null,
+  "Form10IEA": null,
+  "form10IF": {
+    "newTaxRegime": "N"
+  },
+  "form10AC": null,
+  "form10BOR10BB": null,
+  "natOfBus": null,
+  "filingReturn": null,
+  "lastFiledITR": {
+    "foreignBankDetails": [],
+    "usrDeductUndChapVIAType": {},
+    "benefitUs115HFlg": "N",
+    "schedule80D": {
+      "Sec80DSelfFamSrCtznHealth": {
+        "SeniorCitizenFlag": null,
+        "ParentSeniorCitizenFlag": null
+      }
+    },
+    "assetOutIndiaFlag": "NO",
+    "scheduleUD": [],
+    "scheduleSPI": {
+      "specifiedPerson": []
+    },
+    "scheduleAMTC": {
+      "scheduleAMTCDtls": [
+        {
+          "gross": 0,
+          "assYr": "2024-25",
+          "amtCreditSetOfEy": 0,
+          "amtCreditFwd": 0
+        }
+      ]
+    },
+    "totalNumOfMonths": 0,
+    "scheduleHP": {
+      "propertyDetails": []
+    },
+    "scheduleTCS": {
+      "tcs": []
+    },
+    "filingStatus": {
+      "ResidentialStatus": "RES"
+    },
+    "heldUnlistedEqShrPrYrFlg": "N",
+    "compDirectorPrvYrFlg": "N",
+    "scheduleMATC": {},
+    "schedule5A2014": {}
+  },
+  "form3CEA": null,
+  "form3CEB": null
+}

@@ -201,17 +201,25 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
             };
             newData.status = statusMap[pi.status] || pi.status || 'Individual';
 
-            newData.dob = pi.dob || '';
-            newData.birthDate = pi.dob ? new Date(pi.dob).toISOString().split('T')[0] : '';
+            // DOB Mapping - Check both locations
+            const rawDob = pi.dob || pi.orgFirmInfo?.DateOFFormOrIncorp || '';
+            newData.dob = rawDob;
+            newData.birthDate = rawDob ? new Date(rawDob).toISOString().split('T')[0] : '';
             newData.gender = pi.gender || 'M';
+
+            // Father Name Mapping
+            newData.fatherName = pi.fatherName || '';
 
             // Decode Aadhaar if it's base64
             let aadhaar = pi.aadhaarCardNo || '';
-            if (aadhaar && /^[A-Za-z0-9+/=]+$/.test(aadhaar) && !/^\d+$/.test(aadhaar)) {
-                try {
-                    aadhaar = atob(aadhaar);
-                } catch (e) {
-                    console.error('Failed to decode Aadhaar:', e);
+            if (aadhaar) {
+                // Check if it looks like base64 (no digits only, valid base64 chars)
+                if (/^[A-Za-z0-9+/=]+$/.test(aadhaar) && !/^\d{12}$/.test(aadhaar)) {
+                    try {
+                        aadhaar = atob(aadhaar);
+                    } catch (e) {
+                        console.error('Failed to decode Aadhaar:', e);
+                    }
                 }
             }
             newData.aadhaarNumber = aadhaar;
@@ -223,7 +231,6 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
             newData.resFlat = addr.residenceNo || addr.addrLine1Txt || '';
             newData.resBuilding = addr.residenceName || addr.addrLine2Txt || '';
             newData.resRoad = addr.roadOrStreet || addr.addrLine3Txt || '';
-            newData.resArea = addr.localityOrArea || addr.addrLine4Txt || '';
             newData.resArea = addr.localityOrArea || addr.addrLine4Txt || '';
 
             // City Fallback: If city is empty, try locality, then road
@@ -826,25 +833,53 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             )}
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="Flat/Block" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resFlat} onChange={(e) => handleManualDataChange('resFlat', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Building" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resBuilding} onChange={(e) => handleManualDataChange('resBuilding', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Flat/Block</label>
+                                                <input placeholder="Flat/Block" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resFlat} onChange={(e) => handleManualDataChange('resFlat', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Building</label>
+                                                <input placeholder="Building" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resBuilding} onChange={(e) => handleManualDataChange('resBuilding', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="Road/Street" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resRoad} onChange={(e) => handleManualDataChange('resRoad', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Area" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resArea} onChange={(e) => handleManualDataChange('resArea', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Road/Street</label>
+                                                <input placeholder="Road/Street" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resRoad} onChange={(e) => handleManualDataChange('resRoad', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Area</label>
+                                                <input placeholder="Area" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resArea} onChange={(e) => handleManualDataChange('resArea', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resCity} onChange={(e) => handleManualDataChange('resCity', e.target.value)} disabled={mode === 'view'} />
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">City</label>
+                                                <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resCity} onChange={(e) => handleManualDataChange('resCity', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Pin</label>
                                                 <input placeholder="Pin" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['manualData.resPin'] ? 'border-red-500' : 'border-slate-200'}`} value={manualData.resPin} onChange={(e) => handleManualDataChange('resPin', e.target.value)} onBlur={(e) => handleBlur('manualData', 'resPin', e.target.value)} maxLength={6} disabled={mode === 'view'} />
                                                 {errors['manualData.resPin'] && <p className="text-red-500 text-xs mt-1">{errors['manualData.resPin']}</p>}
                                             </div>
-                                            <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resState} onChange={(e) => handleManualDataChange('resState', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">State</label>
+                                                <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resState} onChange={(e) => handleManualDataChange('resState', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input placeholder="STD Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resSTD} onChange={(e) => handleManualDataChange('resSTD', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Phone" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resPhone} onChange={(e) => handleManualDataChange('resPhone', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Country" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resCountry} onChange={(e) => handleManualDataChange('resCountry', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">STD Code</label>
+                                                <input placeholder="STD Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resSTD} onChange={(e) => handleManualDataChange('resSTD', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Phone</label>
+                                                <input placeholder="Phone" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resPhone} onChange={(e) => handleManualDataChange('resPhone', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Country</label>
+                                                <input placeholder="Country" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.resCountry} onChange={(e) => handleManualDataChange('resCountry', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -862,24 +897,55 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             )}
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="Flat/Block" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offFlat} onChange={(e) => handleManualDataChange('offFlat', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Building" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offBuilding} onChange={(e) => handleManualDataChange('offBuilding', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Flat/Block</label>
+                                                <input placeholder="Flat/Block" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offFlat} onChange={(e) => handleManualDataChange('offFlat', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Building</label>
+                                                <input placeholder="Building" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offBuilding} onChange={(e) => handleManualDataChange('offBuilding', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="Road/Street" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offRoad} onChange={(e) => handleManualDataChange('offRoad', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Area" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offArea} onChange={(e) => handleManualDataChange('offArea', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Road/Street</label>
+                                                <input placeholder="Road/Street" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offRoad} onChange={(e) => handleManualDataChange('offRoad', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Area</label>
+                                                <input placeholder="Area" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offArea} onChange={(e) => handleManualDataChange('offArea', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offCity} onChange={(e) => handleManualDataChange('offCity', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Pin" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offPin} onChange={(e) => handleManualDataChange('offPin', e.target.value)} maxLength={6} disabled={mode === 'view'} />
-                                            <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offState} onChange={(e) => handleManualDataChange('offState', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">City</label>
+                                                <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offCity} onChange={(e) => handleManualDataChange('offCity', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Pin</label>
+                                                <input placeholder="Pin" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offPin} onChange={(e) => handleManualDataChange('offPin', e.target.value)} maxLength={6} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">State</label>
+                                                <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offState} onChange={(e) => handleManualDataChange('offState', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input placeholder="STD Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offSTD} onChange={(e) => handleManualDataChange('offSTD', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Phone" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offPhone} onChange={(e) => handleManualDataChange('offPhone', e.target.value)} disabled={mode === 'view'} />
-                                            <input placeholder="Country" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offCountry} onChange={(e) => handleManualDataChange('offCountry', e.target.value)} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">STD Code</label>
+                                                <input placeholder="STD Code" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offSTD} onChange={(e) => handleManualDataChange('offSTD', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Phone</label>
+                                                <input placeholder="Phone" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offPhone} onChange={(e) => handleManualDataChange('offPhone', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Country</label>
+                                                <input placeholder="Country" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offCountry} onChange={(e) => handleManualDataChange('offCountry', e.target.value)} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">e-Mail</label>
                                             <input placeholder="e-Mail" type="email" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={manualData.offEmail} onChange={(e) => handleManualDataChange('offEmail', e.target.value)} disabled={mode === 'view'} />
                                         </div>
                                     </div>
@@ -913,6 +979,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">Bank Name</label>
                                                     <input placeholder="Bank Name" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.bankName`] ? 'border-red-500' : 'border-slate-200'}`} value={account.bankName} onChange={(e) => {
                                                         const updated = [...bankAccounts];
                                                         updated[index].bankName = e.target.value;
@@ -921,6 +988,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     {errors[`bankAccounts.${index}.bankName`] && <p className="text-red-500 text-xs mt-1">{errors[`bankAccounts.${index}.bankName`]}</p>}
                                                 </div>
                                                 <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">Branch</label>
                                                     <input placeholder="Branch" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.branch`] ? 'border-red-500' : 'border-slate-200'}`} value={account.branch} onChange={(e) => {
                                                         const updated = [...bankAccounts];
                                                         updated[index].branch = e.target.value;
@@ -931,6 +999,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">Account Number</label>
                                                     <input placeholder="Account Number" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.accountNumber`] ? 'border-red-500' : 'border-slate-200'}`} value={account.accountNumber} onChange={(e) => {
                                                         const updated = [...bankAccounts];
                                                         updated[index].accountNumber = e.target.value;
@@ -939,6 +1008,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     {errors[`bankAccounts.${index}.accountNumber`] && <p className="text-red-500 text-xs mt-1">{errors[`bankAccounts.${index}.accountNumber`]}</p>}
                                                 </div>
                                                 <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">IFSC Code</label>
                                                     <input placeholder="IFSC Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900 ${errors[`bankAccounts.${index}.ifsc`] ? 'border-red-500' : 'border-slate-200'}`} value={account.ifsc} onChange={(e) => {
                                                         const updated = [...bankAccounts];
                                                         updated[index].ifsc = e.target.value.toUpperCase();
@@ -948,18 +1018,24 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-100 disabled:text-slate-900" value={account.accountType} onChange={(e) => {
-                                                    const updated = [...bankAccounts];
-                                                    updated[index].accountType = e.target.value;
-                                                    setBankAccounts(updated);
-                                                }} disabled={mode === 'view'}>
-                                                    <option>Savings</option><option>Current</option><option>Cash Credit</option><option>Overdraft</option><option>NRO</option><option>Other</option>
-                                                </select>
-                                                <input placeholder="Name as per Bank" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.nameAsPerBank} onChange={(e) => {
-                                                    const updated = [...bankAccounts];
-                                                    updated[index].nameAsPerBank = e.target.value;
-                                                    setBankAccounts(updated);
-                                                }} disabled={mode === 'view'} />
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">Account Type</label>
+                                                    <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-100 disabled:text-slate-900" value={account.accountType} onChange={(e) => {
+                                                        const updated = [...bankAccounts];
+                                                        updated[index].accountType = e.target.value;
+                                                        setBankAccounts(updated);
+                                                    }} disabled={mode === 'view'}>
+                                                        <option>Savings</option><option>Current</option><option>Cash Credit</option><option>Overdraft</option><option>NRO</option><option>Other</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">Name as per Bank</label>
+                                                    <input placeholder="Name as per Bank" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-100 disabled:text-slate-900" value={account.nameAsPerBank} onChange={(e) => {
+                                                        const updated = [...bankAccounts];
+                                                        updated[index].nameAsPerBank = e.target.value;
+                                                        setBankAccounts(updated);
+                                                    }} disabled={mode === 'view'} />
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -988,28 +1064,36 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Assessing Officer Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input placeholder="Area Description" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.areaDesc} onChange={(e) => setJurisdiction({ ...jurisdiction, areaDesc: e.target.value })} disabled={mode === 'view'} />
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Area Description</label>
+                                                <input placeholder="Area Description" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.areaDesc} onChange={(e) => setJurisdiction({ ...jurisdiction, areaDesc: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Area Code</label>
                                                 <input placeholder="Area Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.areaCd'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.areaCd} onChange={(e) => setJurisdiction({ ...jurisdiction, areaCd: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'areaCd', e.target.value)} disabled={mode === 'view'} />
                                                 {errors['jurisdiction.areaCd'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.areaCd']}</p>}
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">AO Name</label>
                                                 <input placeholder="AO Name" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.aoPplrName'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.aoPplrName} onChange={(e) => setJurisdiction({ ...jurisdiction, aoPplrName: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'aoPplrName', e.target.value)} disabled={mode === 'view'} />
                                                 {errors['jurisdiction.aoPplrName'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.aoPplrName']}</p>}
                                             </div>
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Range Code</label>
                                                 <input placeholder="Range Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.rangeCd'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.rangeCd} onChange={(e) => setJurisdiction({ ...jurisdiction, rangeCd: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'rangeCd', e.target.value)} disabled={mode === 'view'} />
                                                 {errors['jurisdiction.rangeCd'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.rangeCd']}</p>}
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">AO Number</label>
                                                 <input placeholder="AO Number" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.aoNo'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.aoNo} onChange={(e) => setJurisdiction({ ...jurisdiction, aoNo: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'aoNo', e.target.value)} disabled={mode === 'view'} />
                                                 {errors['jurisdiction.aoNo'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.aoNo']}</p>}
                                             </div>
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">AO Email</label>
                                                 <input placeholder="AO Email" type="email" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.aoEmailId'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.aoEmailId} onChange={(e) => setJurisdiction({ ...jurisdiction, aoEmailId: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'aoEmailId', e.target.value)} disabled={mode === 'view'} />
                                                 {errors['jurisdiction.aoEmailId'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.aoEmailId']}</p>}
                                             </div>
@@ -1017,12 +1101,25 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                     </div>
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">AO Office Address</h3>
-                                        <input placeholder="Building Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoBldgDesc} onChange={(e) => setJurisdiction({ ...jurisdiction, aoBldgDesc: e.target.value })} disabled={mode === 'view'} />
-                                        <input placeholder="Address" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoAddress} onChange={(e) => setJurisdiction({ ...jurisdiction, aoAddress: e.target.value })} disabled={mode === 'view'} />
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Building Name</label>
+                                            <input placeholder="Building Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoBldgDesc} onChange={(e) => setJurisdiction({ ...jurisdiction, aoBldgDesc: e.target.value })} disabled={mode === 'view'} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Address</label>
+                                            <input placeholder="Address" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.aoAddress} onChange={(e) => setJurisdiction({ ...jurisdiction, aoAddress: e.target.value })} disabled={mode === 'view'} />
+                                        </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.city} onChange={(e) => setJurisdiction({ ...jurisdiction, city: e.target.value })} disabled={mode === 'view'} />
-                                            <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.state} onChange={(e) => setJurisdiction({ ...jurisdiction, state: e.target.value })} disabled={mode === 'view'} />
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">City</label>
+                                                <input placeholder="City" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.city} onChange={(e) => setJurisdiction({ ...jurisdiction, city: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">State</label>
+                                                <input placeholder="State" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={jurisdiction.state} onChange={(e) => setJurisdiction({ ...jurisdiction, state: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Pin Code</label>
                                                 <input placeholder="Pin Code" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['jurisdiction.pinCode'] ? 'border-red-500' : 'border-slate-200'}`} value={jurisdiction.pinCode} onChange={(e) => setJurisdiction({ ...jurisdiction, pinCode: e.target.value })} onBlur={(e) => handleBlur('jurisdiction', 'pinCode', e.target.value)} maxLength={6} disabled={mode === 'view'} />
                                                 {errors['jurisdiction.pinCode'] && <p className="text-red-500 text-xs mt-1">{errors['jurisdiction.pinCode']}</p>}
                                             </div>
@@ -1045,47 +1142,82 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Application Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.applicationType} onChange={(e) => setForm49({ ...form49, applicationType: e.target.value })} disabled={mode === 'view'}>
-                                                <option>New PAN</option><option>Changes/Correction</option><option>Reprint of PAN Card</option>
-                                            </select>
-                                            <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.category} onChange={(e) => setForm49({ ...form49, category: e.target.value })} disabled={mode === 'view'}>
-                                                <option>Individual</option><option>HUF</option><option>Company</option><option>Firm</option><option>AOP</option><option>BOI</option><option>Trust</option><option>LLP</option>
-                                            </select>
-                                            <input placeholder="Source of Income" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.sourceOfIncome} onChange={(e) => setForm49({ ...form49, sourceOfIncome: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Application Type</label>
+                                                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.applicationType} onChange={(e) => setForm49({ ...form49, applicationType: e.target.value })} disabled={mode === 'view'}>
+                                                    <option>New PAN</option><option>Changes/Correction</option><option>Reprint of PAN Card</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+                                                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.category} onChange={(e) => setForm49({ ...form49, category: e.target.value })} disabled={mode === 'view'}>
+                                                    <option>Individual</option><option>HUF</option><option>Company</option><option>Firm</option><option>AOP</option><option>BOI</option><option>Trust</option><option>LLP</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Source of Income</label>
+                                                <input placeholder="Source of Income" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.sourceOfIncome} onChange={(e) => setForm49({ ...form49, sourceOfIncome: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Aadhaar Number</label>
                                                 <input placeholder="Aadhaar Number" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['form49.aadhaarNumber'] ? 'border-red-500' : 'border-slate-200'}`} value={form49.aadhaarNumber} onChange={(e) => setForm49({ ...form49, aadhaarNumber: e.target.value })} onBlur={(e) => handleBlur('form49', 'aadhaarNumber', e.target.value)} maxLength={12} disabled={mode === 'view'} />
                                                 {errors['form49.aadhaarNumber'] && <p className="text-red-500 text-xs mt-1">{errors['form49.aadhaarNumber']}</p>}
                                             </div>
-                                            <input type="date" placeholder="Application Date" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.applicationDate} onChange={(e) => setForm49({ ...form49, applicationDate: e.target.value })} disabled={mode === 'view'} />
-                                            <input placeholder="Acknowledgement No." className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.acknowledgementNumber} onChange={(e) => setForm49({ ...form49, acknowledgementNumber: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Application Date</label>
+                                                <input type="date" placeholder="Application Date" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.applicationDate} onChange={(e) => setForm49({ ...form49, applicationDate: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Acknowledgement No.</label>
+                                                <input placeholder="Acknowledgement No." className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.acknowledgementNumber} onChange={(e) => setForm49({ ...form49, acknowledgementNumber: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Name Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Name on PAN Card</label>
                                                 <input placeholder="Name on PAN Card" className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900 ${errors['form49.nameOnCard'] ? 'border-red-500' : 'border-slate-200'}`} value={form49.nameOnCard} onChange={(e) => setForm49({ ...form49, nameOnCard: e.target.value })} onBlur={(e) => handleBlur('form49', 'nameOnCard', e.target.value)} disabled={mode === 'view'} />
                                                 {errors['form49.nameOnCard'] && <p className="text-red-500 text-xs mt-1">{errors['form49.nameOnCard']}</p>}
                                             </div>
-                                            <input placeholder="Father's Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.fatherName} onChange={(e) => setForm49({ ...form49, fatherName: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Father's Name</label>
+                                                <input placeholder="Father's Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.fatherName} onChange={(e) => setForm49({ ...form49, fatherName: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
-                                        <input placeholder="Mother's Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.motherName} onChange={(e) => setForm49({ ...form49, motherName: e.target.value })} disabled={mode === 'view'} />
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1">Mother's Name</label>
+                                            <input placeholder="Mother's Name" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.motherName} onChange={(e) => setForm49({ ...form49, motherName: e.target.value })} disabled={mode === 'view'} />
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1">Document Proofs</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.proofOfIdentity} onChange={(e) => setForm49({ ...form49, proofOfIdentity: e.target.value })} disabled={mode === 'view'}>
-                                                <option>Aadhaar Card</option><option>Voter ID</option><option>Passport</option><option>Driving License</option><option>Ration Card</option><option>Bank Certificate</option>
-                                            </select>
-                                            <input placeholder="Identity Doc Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.identityDocNumber} onChange={(e) => setForm49({ ...form49, identityDocNumber: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Proof of Identity</label>
+                                                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.proofOfIdentity} onChange={(e) => setForm49({ ...form49, proofOfIdentity: e.target.value })} disabled={mode === 'view'}>
+                                                    <option>Aadhaar Card</option><option>Voter ID</option><option>Passport</option><option>Driving License</option><option>Ration Card</option><option>Bank Certificate</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Identity Doc Number</label>
+                                                <input placeholder="Identity Doc Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.identityDocNumber} onChange={(e) => setForm49({ ...form49, identityDocNumber: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.proofOfAddress} onChange={(e) => setForm49({ ...form49, proofOfAddress: e.target.value })} disabled={mode === 'view'}>
-                                                <option>Aadhaar Card</option><option>Voter ID</option><option>Passport</option><option>Driving License</option><option>Electricity Bill</option><option>Telephone Bill</option><option>Bank Statement</option>
-                                            </select>
-                                            <input placeholder="Address Doc Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.addressDocNumber} onChange={(e) => setForm49({ ...form49, addressDocNumber: e.target.value })} disabled={mode === 'view'} />
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Proof of Address</label>
+                                                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 bg-white disabled:bg-slate-50 disabled:text-slate-900" value={form49.proofOfAddress} onChange={(e) => setForm49({ ...form49, proofOfAddress: e.target.value })} disabled={mode === 'view'}>
+                                                    <option>Aadhaar Card</option><option>Voter ID</option><option>Passport</option><option>Driving License</option><option>Electricity Bill</option><option>Telephone Bill</option><option>Bank Statement</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">Address Doc Number</label>
+                                                <input placeholder="Address Doc Number" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:bg-slate-50 disabled:text-slate-900" value={form49.addressDocNumber} onChange={(e) => setForm49({ ...form49, addressDocNumber: e.target.value })} disabled={mode === 'view'} />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
