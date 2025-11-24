@@ -22,5 +22,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   submitRegistration: (licenseKey: string) => ipcRenderer.invoke('registration:submit', licenseKey),
   getMachineId: () => ipcRenderer.invoke('registration:machine-id'),
   getLicenseDetails: () => ipcRenderer.invoke('registration:details'),
-  revokeLicense: () => ipcRenderer.invoke('registration:revoke')
+  revokeLicense: () => ipcRenderer.invoke('registration:revoke'),
+  // Download API
+  download26AS: (pan: string, password: string, assessmentYear: string) => ipcRenderer.invoke('download:26as', pan, password, assessmentYear),
+  downloadAIS: (pan: string, password: string) => ipcRenderer.invoke('download:ais', pan, password),
+  getDownloadPath: (pan: string) => ipcRenderer.invoke('download:get-path', pan),
+  // Captcha dialog events
+  onCaptchaRequired: (callback: (event: any, data: { image: string }) => void) => ipcRenderer.on('download:captcha-required', callback),
+  sendCaptchaResponse: (text: string, cancelled: boolean) => ipcRenderer.send('download:captcha-response', { text, cancelled }),
+  removeAllCaptchaListeners: () => ipcRenderer.removeAllListeners('download:captcha-required')
 });
