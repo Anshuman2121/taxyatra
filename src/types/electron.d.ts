@@ -18,6 +18,14 @@ export interface ElectronAPI {
   getMachineId: () => Promise<string>;
   getLicenseDetails: () => Promise<any>;
   revokeLicense: () => Promise<any>;
+  // Download API
+  download26AS: (pan: string, password: string, assessmentYear: string) => Promise<{ success: boolean; filePath?: string; message?: string }>;
+  downloadAIS: (pan: string, password: string) => Promise<{ success: boolean; filePath?: string; message?: string }>;
+  getDownloadPath: (pan: string) => Promise<string>;
+  // Captcha dialog events
+  onCaptchaRequired: (callback: (event: any, data: { image: string }) => void) => void;
+  sendCaptchaResponse: (text: string, cancelled: boolean) => void;
+  removeAllCaptchaListeners: () => void;
 }
 
 declare global {

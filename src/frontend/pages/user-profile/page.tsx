@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { TopNavBar } from '../../components/TopNavBar';
 import { BottomBar } from '../../components/BottomBar';
 import { api } from '../../api';
-import { ChevronDown, ChevronUp, Globe, Upload, Edit2, Save, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe, Upload, Edit2, Save, X, Download } from 'lucide-react';
 import { FetchProgressModal } from '../../components/FetchProgressModal';
 import DataPreviewModal from '../../components/DataPreviewModal';
 import { UserProfileSchema, PersonalDetailsSchema, AddressSchema, BankAccountSchema, JurisdictionSchema, Form49Schema } from '../../schemas/userProfile.schema';
 import { JsonUploadButton } from '../../components/JsonUploadButton';
+import { CaptchaDialog } from '../../components/CaptchaDialog';
 import { z } from 'zod';
 
 interface UserProfilePageProps {
@@ -26,6 +27,12 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
 
     const [password, setPassword] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadStatus, setDownloadStatus] = useState('');
+
+    // Captcha dialog state
+    const [showCaptchaDialog, setShowCaptchaDialog] = useState(false);
+    const [captchaImage, setCaptchaImage] = useState('');
 
     // State from original add-user page
     const [manualData, setManualData] = useState({
@@ -396,6 +403,37 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Set up captcha dialog event listeners
+    useEffect(() => {
+        const handleCaptchaRequired = (_: any, data: { image: string }) => {
+            console.log('📸 Captcha required, showing dialog');
+            setCaptchaImage(data.image);
+            setShowCaptchaDialog(true);
+        };
+
+        window.electronAPI.onCaptchaRequired(handleCaptchaRequired);
+
+        return () => {
+            window.electronAPI.removeAllCaptchaListeners();
+        };
+    }, []);
+
+    const handleCaptchaSubmit = (captchaText: string) => {
+        console.log('✅ Sending captcha response:', captchaText);
+        window.electronAPI.sendCaptchaResponse(captchaText, false);
+        setShowCaptchaDialog(false);
+        setCaptchaImage('');
+    };
+
+    const handleCaptchaCancel = () => {
+        console.log('❌ Captcha cancelled');
+        window.electronAPI.sendCaptchaResponse('', true);
+        setShowCaptchaDialog(false);
+        setCaptchaImage('');
+        setIsDownloading(false);
+        setDownloadStatus('');
     };
 
     const toggleSection = (section: keyof typeof expandedSections) => {
@@ -1276,6 +1314,99 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                         </button>
                                     </div>
                                 )}
+
+                                {/* Download AIS Button */}
+                                {mode === 'view' && pan && (
+                                    <>
+                                        <button
+                                            onClick={async () => {
+                                                setIsDownloading(true);
+                                                setDownloadStatus('Starting AIS download...');
+                                                try {
+                                                    // Get stored password for this PAN
+                                                    const credentials = await window.electronAPI.getPanWithPassword(pan);
+
+                                                    if (!credentials || !credentials.password) {
+                                                        setDownloadStatus('❌ Password not found');
+                                                        alert('Password not found for this PAN. Please fetch profile again to store credentials.');
+                                                        setIsDownloading(false);
+                                                        return;
+                                                    }
+
+                                                    setDownloadStatus('🔐 Logging in...');
+                                                    const result = await window.electronAPI.downloadAIS(pan, credentials.password);
+
+                                                    if (result.success) {
+                                                        setDownloadStatus('✅ Downloaded successfully!');
+                                                        alert(`AIS downloaded successfully!\nFile saved to: ${result.filePath}`);
+                                                    } else {
+                                                        setDownloadStatus('❌ Download failed');
+                                                        alert(`Download failed: ${result.message}`);
+                                                    }
+                                                } catch (error: any) {
+                                                    setDownloadStatus('❌ Error');
+                                                    alert(`Error: ${error.message}`);
+                                                } finally {
+                                                    setIsDownloading(false);
+                                                    setTimeout(() => setDownloadStatus(''), 3000);
+                                                }
+                                            }}
+                                            disabled={isDownloading}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>{isDownloading ? downloadStatus : 'Download AIS'}</span>
+                                        </button>
+                                    </>
+                                )}
+
+                                {/* Download 26AS Button */}
+                                {mode === 'view' && pan && (
+                                    <>
+                                        <div className="h-px bg-slate-100 my-2"></div>
+                                        <button
+                                            onClick={async () => {
+                                                setIsDownloading(true);
+                                                setDownloadStatus('Starting download...');
+                                                try {
+                                                    // Get stored password for this PAN
+                                                    const credentials = await window.electronAPI.getPanWithPassword(pan);
+
+                                                    if (!credentials || !credentials.password) {
+                                                        setDownloadStatus('❌ Password not found');
+                                                        alert('Password not found for this PAN. Please fetch profile again to store credentials.');
+                                                        setIsDownloading(false);
+                                                        return;
+                                                    }
+
+                                                    const assessmentYear = '2024-25'; // TODO: Make this selectable
+
+                                                    setDownloadStatus('🔐 Logging in...');
+                                                    const result = await window.electronAPI.download26AS(pan, credentials.password, assessmentYear);
+
+                                                    if (result.success) {
+                                                        setDownloadStatus('✅ Downloaded successfully!');
+                                                        alert(`26AS downloaded successfully!\nFile saved to: ${result.filePath}`);
+                                                    } else {
+                                                        setDownloadStatus('❌ Download failed');
+                                                        alert(`Download failed: ${result.message}`);
+                                                    }
+                                                } catch (error: any) {
+                                                    setDownloadStatus('❌ Error');
+                                                    alert(`Error: ${error.message}`);
+                                                } finally {
+                                                    setIsDownloading(false);
+                                                    setTimeout(() => setDownloadStatus(''), 3000);
+                                                }
+                                            }}
+                                            disabled={isDownloading}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>{isDownloading ? downloadStatus : 'Download 26AS'}</span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -1340,6 +1471,13 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                 onConfirm={handlePreviewConfirm}
                 currentData={{ manualData, bankAccounts, jurisdiction }}
                 newData={fetchedData}
+            />
+
+            <CaptchaDialog
+                isOpen={showCaptchaDialog}
+                captchaImage={captchaImage}
+                onSubmit={handleCaptchaSubmit}
+                onCancel={handleCaptchaCancel}
             />
         </div >
     );
