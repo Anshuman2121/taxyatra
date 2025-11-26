@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { initDatabase, closeDatabase } from './database/connection';
@@ -16,13 +16,45 @@ if (started) {
 
 const createWindow = () => {
     // Create the browser window.
+    // Determine the correct icon path for both development and production
+    const getIconPath = () => {
+        if (process.platform === 'win32') {
+            // For Windows, use .ico format
+            if (process.env.NODE_ENV === 'development') {
+                return path.join(__dirname, '../../build/icon.ico');
+            }
+            // In production, icon is in resources/build directory
+            return path.join(process.resourcesPath, 'build', 'icon.ico');
+        } else if (process.platform === 'darwin') {
+            // For macOS, use .icns format
+            if (process.env.NODE_ENV === 'development') {
+                return path.join(__dirname, '../../build/icon.icns');
+            }
+            return path.join(process.resourcesPath, 'build', 'icon.icns');
+        } else {
+            // For Linux, use .png format
+            if (process.env.NODE_ENV === 'development') {
+                return path.join(__dirname, '../../build/icon.png');
+            }
+            return path.join(process.resourcesPath, 'build', 'icon.png');
+        }
+    };
+
+    const iconPath = getIconPath();
+    console.log('Icon path:', iconPath);
+    
+    // Use nativeImage for better cross-platform icon handling
+    const appIcon = nativeImage.createFromPath(iconPath);
+
     const mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 1024,
         minHeight: 768,
         show: false, // Don't show until maximized
-        icon: path.join(__dirname, '../../build/icon.png'),
+        title: 'TaxYatra',
+        icon: appIcon,
+        autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, '../preload/preload.js'),
             nodeIntegration: false,
