@@ -74,12 +74,12 @@ export function registerDownloadHandlers() {
         }
     });
 
-    ipcMain.handle('download:ais', async (event, pan: string, password: string) => {
-        console.log('📥 [Download Controller] AIS download requested for PAN:', pan);
+    ipcMain.handle('download:ais', async (event, pan: string, password: string, financialYear: string) => {
+        console.log('📥 [Download Controller] AIS download requested for PAN:', pan, 'F.Y.:', financialYear);
 
         try {
-            // Create download directory if it doesn't exist
-            const downloadsDir = path.join(app.getPath('downloads'), 'TaxYatra', 'AIS', pan);
+            // Create download directory if it doesn't exist - match TIS pattern
+            const downloadsDir = path.join(app.getPath('downloads'), 'TaxYatra', pan, financialYear, 'AIS');
             if (!fs.existsSync(downloadsDir)) {
                 fs.mkdirSync(downloadsDir, { recursive: true });
                 console.log('📁 [Download Controller] Created download directory:', downloadsDir);
@@ -90,6 +90,7 @@ export function registerDownloadHandlers() {
             const result = await puppeteerService.downloadAIS(
                 pan,
                 password,
+                financialYear,
                 downloadsDir,
                 event, // Pass the event object for captcha communication
                 (status: string) => {

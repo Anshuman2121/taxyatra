@@ -1323,6 +1323,24 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                 {/* Download AIS Button */}
                                 {mode === 'view' && pan && (
                                     <>
+                                        {/* Financial Year Selector for AIS/TIS */}
+                                        <div className="mt-3">
+                                            <label className="block text-xs font-medium text-slate-600 mb-2">
+                                                Select Financial Year for AIS/TIS
+                                            </label>
+                                            <select
+                                                value={selectedFinancialYear}
+                                                onChange={(e) => setSelectedFinancialYear(e.target.value)}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400/50 bg-white text-sm"
+                                            >
+                                                <option value="2025-26">F.Y. 2025-26</option>
+                                                <option value="2024-25">F.Y. 2024-25</option>
+                                                <option value="2023-24">F.Y. 2023-24</option>
+                                                <option value="2022-23">F.Y. 2022-23</option>
+                                                <option value="2021-22">F.Y. 2021-22</option>
+                                            </select>
+                                        </div>
+
                                         <button
                                             onClick={async () => {
                                                 setIsDownloadingAIS(true);
@@ -1339,7 +1357,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     }
 
                                                     setDownloadStatus('🔐 Logging in...');
-                                                    const result = await window.electronAPI.downloadAIS(pan, credentials.password);
+                                                    const result = await window.electronAPI.downloadAIS(pan, credentials.password, selectedFinancialYear);
 
                                                     if (result.success) {
                                                         setDownloadStatus('✅ Downloaded successfully!');
@@ -1363,23 +1381,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                             <span>{isDownloadingAIS ? downloadStatus : 'Download AIS'}</span>
                                         </button>
 
-                                        {/* Financial Year Selector for TIS */}
-                                        <div className="mt-3">
-                                            <label className="block text-xs font-medium text-slate-600 mb-2">
-                                                Select Financial Year for TIS
-                                            </label>
-                                            <select
-                                                value={selectedFinancialYear}
-                                                onChange={(e) => setSelectedFinancialYear(e.target.value)}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400/50 bg-white text-sm"
-                                            >
-                                                <option value="2025-26">F.Y. 2025-26</option>
-                                                <option value="2024-25">F.Y. 2024-25</option>
-                                                <option value="2023-24">F.Y. 2023-24</option>
-                                                <option value="2022-23">F.Y. 2022-23</option>
-                                                <option value="2021-22">F.Y. 2021-22</option>
-                                            </select>
-                                        </div>
+
 
                                         {/* Download TIS Button */}
                                         <button

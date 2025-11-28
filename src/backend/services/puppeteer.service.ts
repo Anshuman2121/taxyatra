@@ -707,11 +707,12 @@ export class PuppeteerService {
     async downloadAIS(
         pan: string,
         password: string,
+        financialYear: string,
         downloadPath: string,
         event: Electron.IpcMainInvokeEvent,
         onProgress?: (status: string) => void
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
-        console.log('📥 [Puppeteer] AIS Download started');
+        console.log('📥 [Puppeteer] AIS Download started for F.Y.:', financialYear);
 
         const browser = await puppeteer.launch({
             headless: false, // Show browser for debugging and captcha entry
@@ -901,19 +902,233 @@ export class PuppeteerService {
                 downloadPath: downloadPath
             });
 
-            // Wait for AIS page to load
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
-            // Click "Download AIS/TIS" button
-            onProgress?.('Clicking Download AIS/TIS button...');
+            // Now click the "AIS" tab on this page (next to "Instructions" tab)
+            onProgress?.('Clicking AIS tab on AIS page...');
+            console.log('🔍 [Puppeteer] Looking for AIS tab (next to Instructions)...');
+
+            const aisTabClicked = await aisPage.evaluate(() => {
+                // Look for the AIS tab - it's next to "Instructions" tab
+                const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
+
+                // Find elements with exactly "AIS" text (not "AIS Instructions")
+                const aisElements = allElements.filter(el => {
+                    const text = el.textContent?.trim();
+                    return text === 'AIS';
+                });
+
+                console.log(`Found ${aisElements.length} elements with "AIS" text`);
+
+                // Look for one that's a tab (likely has role="tab" or is near "Instructions")
+                for (const el of aisElements) {
+                    const role = el.getAttribute('role');
+                    const parent = el.parentElement;
+
+                    // Check if it's a tab or near the Instructions tab
+                    if (role === 'tab' || parent?.textContent?.includes('Instructions')) {
+                        console.log('Found AIS tab, clicking...');
+                        if (el instanceof HTMLElement) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                }
+
+                // Fallback: click the first AIS element
+                if (aisElements.length > 0 && aisElements[0] instanceof HTMLElement) {
+                    console.log('Fallback: clicking first AIS element...');
+                    aisElements[0].click();
+                    return true;
+                }
+
+                return false;
+            });
+
+            if (!aisTabClicked) {
+                console.log('⚠️ [Puppeteer] Could not find AIS tab, continuing anyway...');
+            } else {
+                console.log('✅ [Puppeteer] AIS tab clicked');
+            }
+
+            // Step 3: Click on the AIS card (the entire card is clickable)
+            onProgress?.('Clicking on AIS card...');
+            console.log('🔍 [Puppeteer] Looking for AIS card to click...');
+
+            // Wait a bit for cards to fully render
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const aisCardClicked = await aisPage.evaluate(() => {
+                const debugInfo: string[] = [];
+                debugInfo.push('Starting AIS card search...');
+
+                // Find the AIS card - look for card elements containing AIS text
+                const allCards = Array.from(document.querySelectorAll('[class*="card"]'));
+                debugInfo.push(`Total card elements: ${allCards.length}`);
+
+                // Log all card texts for debugging
+                allCards.forEach((card, idx) => {
+                    const text = card.textContent?.trim() || '';
+                    debugInfo.push(`Card ${idx}: "${text.substring(0, 80)}..."`);
+                });
+
+                let aisCardCandidates: Array<{ el: Element, text: string, length: number }> = [];
+
+                for (const card of allCards) {
+                    const text = card.textContent?.trim() || '';
+                    const normalizedText = text.replace(/\s+/g, ' ');
+
+                    // Look for AIS card - more flexible matching
+                    // Must contain "Annual Information Statement" OR "AIS"
+                    // Must NOT contain "Taxpayer Information Summary" or just "TIS" alone
+                    const hasAISText = normalizedText.includes('Annual Information Statement') ||
+                        (normalizedText.includes('AIS') && normalizedText.includes('Annual'));
+                    const notTIS = !normalizedText.includes('Taxpayer Information Summary') &&
+                        !(normalizedText.includes('TIS') && !normalizedText.includes('AIS'));
+
+                    if (hasAISText && notTIS) {
+                        aisCardCandidates.push({ el: card, text: normalizedText, length: text.length });
+                        debugInfo.push(`Found AIS candidate: length=${text.length}, text="${normalizedText.substring(0, 50)}..."`);
+                    }
+                }
+
+                debugInfo.push(`Found ${aisCardCandidates.length} AIS card candidates`);
+
+                // Sort by text length (smallest first) to get the most specific card
+                aisCardCandidates.sort((a, b) => a.length - b.length);
+
+                // Click the smallest (most specific) AIS card
+                if (aisCardCandidates.length > 0) {
+                    const aisCard = aisCardCandidates[0];
+                    debugInfo.push(`Clicking AIS card with text length: ${aisCard.length}`);
+
+                    if (aisCard.el instanceof HTMLElement) {
+                        aisCard.el.click();
+                        return { success: true, method: 'card-click', tag: aisCard.el.tagName, textLength: aisCard.length, debug: debugInfo };
+                    }
+                }
+
+                debugInfo.push('AIS card not found!');
+                return { success: false, error: 'AIS card not found', debug: debugInfo };
+            });
+
+            console.log('📋 [Puppeteer] AIS card click result:', JSON.stringify(aisCardClicked, null, 2));
+
+            if (!aisCardClicked.success) {
+                throw new Error(`AIS card not found: ${aisCardClicked.error || 'unknown error'}`);
+            }
+
+            console.log(`✅ [Puppeteer] AIS card clicked (method: ${aisCardClicked.method})`);
+
+            // Wait for navigation to AIS page
+            onProgress?.('Waiting for AIS page to load...');
+            console.log('⏳ [Puppeteer] Waiting for AIS page to load...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Step 4: Select Financial Year from dropdown (reuse TIS logic)
+            onProgress?.(`Selecting financial year ${financialYear}...`);
+            console.log(`🔍 [Puppeteer] Selecting F.Y. ${financialYear} from dropdown...`);
+
+            try {
+                // Wait a bit for the page to fully load
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Find and click the F.Y. dropdown
+                const dropdownInfo = await aisPage.evaluate(() => {
+                    const debugInfo: string[] = [];
+
+                    // Look for app-dropdown-btn specifically
+                    const appDropdown = document.querySelector('app-dropdown-btn');
+                    if (appDropdown) {
+                        debugInfo.push('Found app-dropdown-btn element');
+                        const button = appDropdown.querySelector('button');
+                        if (button) {
+                            const text = button.textContent?.trim() || '';
+                            debugInfo.push(`Button text: "${text}"`);
+                            if (button instanceof HTMLElement) {
+                                button.click();
+                                return { success: true, method: 'app-dropdown-btn', text, debug: debugInfo };
+                            }
+                        }
+                    }
+
+                    // Fallback: look for any element with F.Y. text
+                    const allElements = Array.from(document.querySelectorAll('button, select, [role="combobox"]'));
+                    for (const el of allElements) {
+                        const text = el.textContent?.trim() || '';
+                        if (text.includes('F.Y.') && text.match(/20\d{2}-\d{2}/)) {
+                            debugInfo.push(`Found F.Y. element: "${text}"`);
+                            if (el instanceof HTMLElement) {
+                                el.click();
+                                return { success: true, method: 'fy-text-match', text, debug: debugInfo };
+                            }
+                        }
+                    }
+
+                    debugInfo.push('No F.Y. dropdown found');
+                    return { success: false, debug: debugInfo };
+                });
+
+                console.log('📋 [Puppeteer] Dropdown search result:', JSON.stringify(dropdownInfo, null, 2));
+
+                if (dropdownInfo.success) {
+                    console.log(`✅ [Puppeteer] Clicked F.Y. dropdown (${dropdownInfo.method})`);
+
+                    // Wait for dropdown options to appear
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+
+                    // Select the specific year
+                    const optionResult = await aisPage.evaluate((fy: string) => {
+                        const debugInfo: string[] = [];
+
+                        // Look for dropdown options with the specific year
+                        const options = Array.from(document.querySelectorAll('button.dropdown-item, mat-option, [role="option"], li, option'));
+                        debugInfo.push(`Found ${options.length} dropdown options`);
+
+                        for (const option of options) {
+                            const text = option.textContent?.trim() || '';
+                            debugInfo.push(`Option: "${text}"`);
+
+                            if (text.includes(fy)) {
+                                debugInfo.push(`Clicking option with F.Y. ${fy}`);
+                                if (option instanceof HTMLElement) {
+                                    option.click();
+                                    return { success: true, text, debug: debugInfo };
+                                }
+                            }
+                        }
+
+                        debugInfo.push(`F.Y. ${fy} option not found`);
+                        return { success: false, debug: debugInfo };
+                    }, financialYear);
+
+                    console.log('📋 [Puppeteer] Option selection result:', JSON.stringify(optionResult, null, 2));
+
+                    if (optionResult.success) {
+                        console.log(`✅ [Puppeteer] Selected F.Y. ${financialYear}`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } else {
+                        console.log(`⚠️ [Puppeteer] Could not select F.Y. ${financialYear}, continuing anyway...`);
+                    }
+                } else {
+                    console.log('⚠️ [Puppeteer] F.Y. dropdown not found, continuing anyway...');
+                }
+            } catch (error) {
+                console.log('⚠️ [Puppeteer] Error selecting F.Y., continuing anyway:', error);
+            }
+
+            // Step 5: Click Download button
+            onProgress?.('Clicking Download button...');
+            console.log('🔍 [Puppeteer] Looking for Download button...');
+
             const downloadBtnClicked = await aisPage.evaluate(() => {
                 const buttons = Array.from(document.querySelectorAll('button'));
                 const downloadBtn = buttons.find(btn => {
                     const text = btn.textContent?.trim() || '';
-                    return text.includes('Download AIS/TIS') || text.includes('Download');
+                    return text === 'Download' || text.includes('Download');
                 });
-                if (downloadBtn) {
-                    console.log('✅ Found Download AIS/TIS button, clicking...');
+                if (downloadBtn && downloadBtn instanceof HTMLElement) {
+                    console.log('✅ Found Download button, clicking...');
                     downloadBtn.click();
                     return true;
                 }
@@ -921,36 +1136,57 @@ export class PuppeteerService {
             });
 
             if (!downloadBtnClicked) {
-                throw new Error('Download AIS/TIS button not found');
+                throw new Error('Download button not found');
             }
 
+            console.log('✅ [Puppeteer] Download button clicked');
             await new Promise(resolve => setTimeout(resolve, 3000));
 
-            // Click the second Download button for JSON format
-            onProgress?.('Selecting JSON download format...');
-            const jsonDownloadClicked = await aisPage.evaluate(() => {
-                // Look for the specific download button for JSON
-                const buttons = Array.from(document.querySelectorAll('button'));
-                // Find the button that corresponds to "Annual Information Statement (AIS) - JSON (for AIS Utility)"
-                const jsonBtn = buttons.find(btn => {
-                    const text = btn.textContent?.trim() || '';
-                    // The button text is just "Download", but it's the second one in the modal
-                    return text === 'Download';
-                });
+            // Step 6: Handle download modal - click JSON Download button in modal
+            onProgress?.('Handling download modal - selecting JSON format...');
+            console.log('🔍 [Puppeteer] Looking for JSON Download button in modal...');
 
-                // We need to find the correct Download button (second one for JSON)
-                const downloadButtons = buttons.filter(btn => btn.textContent?.trim() === 'Download');
-                if (downloadButtons.length >= 2) {
-                    console.log('✅ Found JSON Download button (second Download), clicking...');
-                    downloadButtons[1].click(); // Second download button is for JSON
-                    return true;
+            const modalDownloadClicked = await aisPage.evaluate(() => {
+                // Look for Download button in modal specifically for JSON
+                const modals = document.querySelectorAll('[role="dialog"], .modal, .dialog, [class*="modal"]');
+                for (const modal of modals) {
+                    // Look for all Download buttons
+                    const buttons = Array.from(modal.querySelectorAll('button'));
+                    const downloadButtons = buttons.filter(btn => btn.textContent?.trim() === 'Download');
+
+                    console.log(`Found ${downloadButtons.length} Download buttons in modal`);
+
+                    // Find the JSON download button - it should be the 2nd one or near "JSON" text
+                    for (let i = 0; i < downloadButtons.length; i++) {
+                        const btn = downloadButtons[i];
+                        // Check if this button is near "JSON" or "AIS Utility" text
+                        const parent = btn.closest('div, section, article');
+                        const parentText = parent?.textContent || '';
+
+                        if (parentText.includes('JSON') || parentText.includes('AIS Utility')) {
+                            console.log(`✅ Found JSON Download button (button ${i + 1}), clicking...`);
+                            if (btn instanceof HTMLElement) {
+                                btn.click();
+                                return true;
+                            }
+                        }
+                    }
+
+                    // Fallback: click the 2nd Download button (index 1)
+                    if (downloadButtons.length >= 2 && downloadButtons[1] instanceof HTMLElement) {
+                        console.log('✅ Fallback: clicking 2nd Download button for JSON...');
+                        downloadButtons[1].click();
+                        return true;
+                    }
                 }
                 return false;
             });
 
-            if (!jsonDownloadClicked) {
-                throw new Error('JSON Download button not found');
+            if (!modalDownloadClicked) {
+                throw new Error('JSON Download button in modal not found');
             }
+
+            console.log('✅ [Puppeteer] Modal JSON Download button clicked');
 
             // Wait for captcha modal to appear
             onProgress?.('Waiting for captcha modal...');
