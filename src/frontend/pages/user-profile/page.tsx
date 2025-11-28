@@ -27,8 +27,11 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
 
     const [password, setPassword] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [isDownloading, setIsDownloading] = useState(false);
+    const [isDownloadingAIS, setIsDownloadingAIS] = useState(false);
+    const [isDownloadingTIS, setIsDownloadingTIS] = useState(false);
+    const [isDownloading26AS, setIsDownloading26AS] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('');
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState('2024-25');
 
     // Captcha dialog state
     const [showCaptchaDialog, setShowCaptchaDialog] = useState(false);
@@ -432,7 +435,9 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
         window.electronAPI.sendCaptchaResponse('', true);
         setShowCaptchaDialog(false);
         setCaptchaImage('');
-        setIsDownloading(false);
+        setIsDownloadingAIS(false);
+        setIsDownloadingTIS(false);
+        setIsDownloading26AS(false);
         setDownloadStatus('');
     };
 
@@ -1320,7 +1325,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                     <>
                                         <button
                                             onClick={async () => {
-                                                setIsDownloading(true);
+                                                setIsDownloadingAIS(true);
                                                 setDownloadStatus('Starting AIS download...');
                                                 try {
                                                     // Get stored password for this PAN
@@ -1329,7 +1334,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     if (!credentials || !credentials.password) {
                                                         setDownloadStatus('❌ Password not found');
                                                         alert('Password not found for this PAN. Please fetch profile again to store credentials.');
-                                                        setIsDownloading(false);
+                                                        setIsDownloadingAIS(false);
                                                         return;
                                                     }
 
@@ -1347,15 +1352,74 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     setDownloadStatus('❌ Error');
                                                     alert(`Error: ${error.message}`);
                                                 } finally {
-                                                    setIsDownloading(false);
+                                                    setIsDownloadingAIS(false);
                                                     setTimeout(() => setDownloadStatus(''), 3000);
                                                 }
                                             }}
-                                            disabled={isDownloading}
+                                            disabled={isDownloadingAIS}
                                             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <Download className="w-4 h-4" />
-                                            <span>{isDownloading ? downloadStatus : 'Download AIS'}</span>
+                                            <span>{isDownloadingAIS ? downloadStatus : 'Download AIS'}</span>
+                                        </button>
+
+                                        {/* Financial Year Selector for TIS */}
+                                        <div className="mt-3">
+                                            <label className="block text-xs font-medium text-slate-600 mb-2">
+                                                Select Financial Year for TIS
+                                            </label>
+                                            <select
+                                                value={selectedFinancialYear}
+                                                onChange={(e) => setSelectedFinancialYear(e.target.value)}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400/50 bg-white text-sm"
+                                            >
+                                                <option value="2025-26">F.Y. 2025-26</option>
+                                                <option value="2024-25">F.Y. 2024-25</option>
+                                                <option value="2023-24">F.Y. 2023-24</option>
+                                                <option value="2022-23">F.Y. 2022-23</option>
+                                                <option value="2021-22">F.Y. 2021-22</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Download TIS Button */}
+                                        <button
+                                            onClick={async () => {
+                                                setIsDownloadingTIS(true);
+                                                setDownloadStatus('Starting TIS download...');
+                                                try {
+                                                    // Get stored password for this PAN
+                                                    const credentials = await window.electronAPI.getPanWithPassword(pan);
+
+                                                    if (!credentials || !credentials.password) {
+                                                        setDownloadStatus('❌ Password not found');
+                                                        alert('Password not found for this PAN. Please fetch profile again to store credentials.');
+                                                        setIsDownloadingTIS(false);
+                                                        return;
+                                                    }
+
+                                                    setDownloadStatus('🔐 Logging in...');
+                                                    const result = await window.electronAPI.downloadTIS(pan, credentials.password, selectedFinancialYear);
+
+                                                    if (result.success) {
+                                                        setDownloadStatus('✅ Downloaded successfully!');
+                                                        alert(`TIS downloaded successfully!\nFile saved to: ${result.filePath}`);
+                                                    } else {
+                                                        setDownloadStatus('❌ Download failed');
+                                                        alert(`Download failed: ${result.message}`);
+                                                    }
+                                                } catch (error: any) {
+                                                    setDownloadStatus('❌ Error');
+                                                    alert(`Error: ${error.message}`);
+                                                } finally {
+                                                    setIsDownloadingTIS(false);
+                                                    setTimeout(() => setDownloadStatus(''), 3000);
+                                                }
+                                            }}
+                                            disabled={isDownloadingTIS}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed mt-3"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>{isDownloadingTIS ? downloadStatus : 'Download TIS'}</span>
                                         </button>
                                     </>
                                 )}
@@ -1366,7 +1430,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                         <div className="h-px bg-slate-100 my-2"></div>
                                         <button
                                             onClick={async () => {
-                                                setIsDownloading(true);
+                                                setIsDownloading26AS(true);
                                                 setDownloadStatus('Starting download...');
                                                 try {
                                                     // Get stored password for this PAN
@@ -1375,7 +1439,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     if (!credentials || !credentials.password) {
                                                         setDownloadStatus('❌ Password not found');
                                                         alert('Password not found for this PAN. Please fetch profile again to store credentials.');
-                                                        setIsDownloading(false);
+                                                        setIsDownloading26AS(false);
                                                         return;
                                                     }
 
@@ -1395,15 +1459,15 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                     setDownloadStatus('❌ Error');
                                                     alert(`Error: ${error.message}`);
                                                 } finally {
-                                                    setIsDownloading(false);
+                                                    setIsDownloading26AS(false);
                                                     setTimeout(() => setDownloadStatus(''), 3000);
                                                 }
                                             }}
-                                            disabled={isDownloading}
+                                            disabled={isDownloading26AS}
                                             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <Download className="w-4 h-4" />
-                                            <span>{isDownloading ? downloadStatus : 'Download 26AS'}</span>
+                                            <span>{isDownloading26AS ? downloadStatus : 'Download 26AS'}</span>
                                         </button>
                                     </>
                                 )}

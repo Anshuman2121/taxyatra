@@ -21,6 +21,7 @@ export interface ElectronAPI {
   // Download API
   download26AS: (pan: string, password: string, assessmentYear: string) => Promise<{ success: boolean; filePath?: string; message?: string }>;
   downloadAIS: (pan: string, password: string) => Promise<{ success: boolean; filePath?: string; message?: string }>;
+  downloadTIS: (pan: string, password: string, financialYear: string) => Promise<{ success: boolean; filePath?: string; message?: string }>;
   getDownloadPath: (pan: string) => Promise<string>;
   // Captcha dialog events
   onCaptchaRequired: (callback: (event: any, data: { image: string }) => void) => void;
