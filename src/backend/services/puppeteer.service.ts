@@ -1445,6 +1445,812 @@ export class PuppeteerService {
         }
     }
 
+    async downloadTIS(
+        pan: string,
+        password: string,
+        financialYear: string,
+        downloadPath: string,
+        event: Electron.IpcMainInvokeEvent,
+        onProgress?: (status: string) => void
+    ): Promise<{ success: boolean; filePath?: string; message?: string }> {
+        console.log('📥 [Puppeteer] TIS Download started for F.Y.:', financialYear);
+
+        const browser = await puppeteer.launch({
+            headless: false,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--start-maximized'
+            ],
+            defaultViewport: null,
+            devtools: false
+        });
+
+        try {
+            const page = await browser.newPage();
+
+            // Set download behavior
+            const client = await page.createCDPSession();
+            await client.send('Page.setDownloadBehavior', {
+                behavior: 'allow',
+                downloadPath: downloadPath
+            });
+
+            // Step 1: Login (reuse login logic from downloadAIS)
+            onProgress?.('Logging in to Income Tax portal...');
+            await page.goto('https://eportal.incometax.gov.in/iec/foservices/#/login', {
+                waitUntil: 'networkidle0',
+                timeout: 60000
+            });
+
+            const currentUrl = page.url();
+            console.log('📍 [Puppeteer] Navigated to login page, URL:', currentUrl);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Enter PAN
+            console.log('🔍 [Puppeteer] Looking for PAN input field...');
+            await page.waitForSelector('#panAdhaarUserId', { timeout: 15000 });
+            console.log('✅ [Puppeteer] Found PAN input field');
+            await page.type('#panAdhaarUserId', pan);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Click Continue
+            await page.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const continueBtn = btns.find(b => b.textContent?.includes('Continue'));
+                if (continueBtn) continueBtn.click();
+            });
+            await new Promise(resolve => setTimeout(resolve, 4000));
+
+            // Check secure access checkbox
+            await page.waitForSelector('#passwordCheckBox-input', { timeout: 10000 });
+            await page.click('#passwordCheckBox-input');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Enter password
+            await page.waitForSelector('#loginPasswordField', { timeout: 10000 });
+            await page.type('#loginPasswordField', password);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Click Login button
+            await page.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const loginBtn = btns.find(b => b.textContent?.includes('Continue'));
+                if (loginBtn) loginBtn.click();
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Check for dual login
+            const pageText = await page.evaluate(() => document.body.innerText);
+            if (pageText.includes('Dual Login') || (pageText.includes('session') && pageText.includes('active'))) {
+                console.log('⚠️ [Puppeteer] Dual login detected, handling...');
+                await page.evaluate(() => {
+                    const buttons = Array.from(document.querySelectorAll('button, a'));
+                    const loginHereBtn = buttons.find(el => {
+                        const text = el.textContent?.trim() || '';
+                        return text.toLowerCase().includes('login here');
+                    });
+                    if (loginHereBtn && loginHereBtn instanceof HTMLElement) {
+                        loginHereBtn.click();
+                    }
+                });
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+
+            console.log('✅ [Puppeteer] Login successful, continuing with TIS download');
+
+            // Step 2: Navigate to dashboard
+            onProgress?.('Navigating to dashboard...');
+            await page.goto('https://eportal.incometax.gov.in/iec/foservices/#/dashboard', {
+                waitUntil: 'networkidle0',
+                timeout: 60000
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Set up listener for new AIS tab BEFORE clicking the link
+            onProgress?.('Setting up for AIS navigation...');
+            const newTabPromise = new Promise<any>((resolve) => {
+                browser.once('targetcreated', async (target) => {
+                    const newPage = await target.page();
+                    resolve(newPage);
+                });
+            });
+
+            // Click on AIS link
+            onProgress?.('Clicking AIS link...');
+            console.log('🔍 [Puppeteer] Looking for AIS link...');
+
+            try {
+                await page.waitForFunction(
+                    () => {
+                        const elements = Array.from(document.querySelectorAll('a, button, div, span'));
+                        const aisElements = elements.filter(el => el.textContent?.trim() === 'AIS');
+                        // Need at least 2 AIS elements (nav + tab)
+                        return aisElements.length >= 2;
+                    },
+                    { timeout: 20000 }
+                );
+
+                // Click AIS link - look for the actual link element, not nested children
+                const clickResult = await page.evaluate(() => {
+                    const elements = Array.from(document.querySelectorAll('a, button, div, span'));
+                    const aisElements = elements.filter(el => el.textContent?.trim() === 'AIS');
+
+                    // Return element details for logging
+                    const elementDetails = aisElements.map((el, index) => ({
+                        index: index + 1,
+                        tag: el.tagName,
+                        classes: el.className,
+                        role: el.getAttribute('role'),
+                        parent: el.parentElement?.tagName,
+                        id: el.id
+                    }));
+
+                    // Find the actual AIS link - prioritize element with id="AIS" or first <A> tag
+                    let aisLink = aisElements.find(el => el.id === 'AIS');
+
+                    if (!aisLink) {
+                        // Fallback: find first <A> tag with AIS text
+                        aisLink = aisElements.find(el => el.tagName === 'A');
+                    }
+
+                    if (!aisLink) {
+                        // Last resort: use first element
+                        aisLink = aisElements[0];
+                    }
+
+                    if (aisLink && aisLink instanceof HTMLElement) {
+                        const clickedIndex = aisElements.indexOf(aisLink) + 1;
+                        aisLink.click();
+                        return {
+                            success: true,
+                            clickedIndex,
+                            clickedElement: {
+                                tag: aisLink.tagName,
+                                id: aisLink.id,
+                                classes: aisLink.className
+                            },
+                            totalElements: aisElements.length,
+                            elementDetails
+                        };
+                    }
+                    return { success: false, totalElements: aisElements.length, elementDetails };
+                });
+
+                console.log('🔍 [Puppeteer] Click result:', JSON.stringify(clickResult, null, 2));
+
+                console.log('✅ [Puppeteer] AIS link clicked');
+            } catch (error) {
+                console.error('❌ [Puppeteer] Error finding/clicking AIS link:', error);
+                throw new Error('AIS link not found');
+            }
+
+            // Wait for new AIS tab to open
+            onProgress?.('Waiting for AIS tab to open...');
+            let aisPage;
+            try {
+                aisPage = await Promise.race([
+                    newTabPromise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('AIS tab timeout')), 15000))
+                ]);
+                console.log('✅ [Puppeteer] AIS tab opened');
+            } catch (error) {
+                // If new tab didn't open, check if we're already on AIS page
+                const currentUrl = page.url();
+                if (currentUrl.includes('insight.gov.in')) {
+                    console.log('✅ [Puppeteer] Already on AIS page (same tab)');
+                    aisPage = page;
+                } else {
+                    throw new Error('AIS tab did not open');
+                }
+            }
+
+            await aisPage.bringToFront();
+
+            // Wait for AIS content to actually load - look for specific AIS page indicators
+            onProgress?.('Waiting for AIS content to load...');
+            console.log('⏳ [Puppeteer] Waiting for AIS content to load...');
+
+            try {
+                // Wait for either URL change or AIS-specific content to appear
+                await Promise.race([
+                    // Option 1: Wait for URL to contain 'ais' or 'insight'
+                    aisPage.waitForFunction(
+                        () => window.location.href.includes('ais') || window.location.href.includes('insight'),
+                        { timeout: 15000 }
+                    ),
+                    // Option 2: Wait for AIS page content to appear
+                    aisPage.waitForFunction(
+                        () => {
+                            const text = document.body.innerText;
+                            return text.includes('Annual Information Statement') ||
+                                text.includes('Taxpayer Information Summary') ||
+                                text.includes('F.Y. 202');
+                        },
+                        { timeout: 15000 }
+                    )
+                ]);
+                console.log('✅ [Puppeteer] AIS content detected');
+            } catch (error) {
+                console.log('⚠️ [Puppeteer] AIS content wait timeout, checking page state...');
+            }
+
+            // Additional wait for page to stabilize
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            console.log('✅ [Puppeteer] On AIS tab content');
+
+            // Debug: Check what's on the page
+            const pageDebug = await aisPage.evaluate(() => {
+                const bodyText = document.body.innerText.substring(0, 500);
+                const hasDropdown = document.querySelectorAll('select').length;
+                const hasTIS = document.body.innerText.includes('TIS') || document.body.innerText.includes('Taxpayer Information Summary');
+                return { bodyText, hasDropdown, hasTIS };
+            });
+            console.log('📋 [Puppeteer] Page debug:', pageDebug);
+
+            // Set download behavior for the AIS page
+            const aisClient = await aisPage.createCDPSession();
+            await aisClient.send('Page.setDownloadBehavior', {
+                behavior: 'allow',
+                downloadPath: downloadPath
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Now click the "AIS" tab on this page (next to "Instructions" tab)
+            onProgress?.('Clicking AIS tab on AIS page...');
+            console.log('🔍 [Puppeteer] Looking for AIS tab (next to Instructions)...');
+
+            const aisTabClicked = await aisPage.evaluate(() => {
+                // Look for the AIS tab - it's next to "Instructions" tab
+                const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
+
+                // Find elements with exactly "AIS" text (not "AIS Instructions")
+                const aisElements = allElements.filter(el => {
+                    const text = el.textContent?.trim();
+                    return text === 'AIS';
+                });
+
+                console.log(`Found ${aisElements.length} elements with "AIS" text`);
+
+                // Look for one that's a tab (likely has role="tab" or is near "Instructions")
+                for (const el of aisElements) {
+                    const role = el.getAttribute('role');
+                    const parent = el.parentElement;
+
+                    // Check if it's a tab or near the Instructions tab
+                    if (role === 'tab' || parent?.textContent?.includes('Instructions')) {
+                        console.log('Found AIS tab, clicking...');
+                        if (el instanceof HTMLElement) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                }
+
+                // Fallback: click the first AIS element
+                if (aisElements.length > 0 && aisElements[0] instanceof HTMLElement) {
+                    console.log('Fallback: clicking first AIS element...');
+                    aisElements[0].click();
+                    return true;
+                }
+
+                return false;
+            });
+
+            if (!aisTabClicked) {
+                console.log('⚠️ [Puppeteer] Could not find AIS tab, continuing anyway...');
+            } else {
+                console.log('✅ [Puppeteer] AIS tab clicked');
+            }
+
+            // Step 3: Click on the TIS card (the entire card is clickable)
+            onProgress?.('Clicking on TIS card...');
+            console.log('🔍 [Puppeteer] Looking for TIS card to click...');
+
+            // Wait a bit for cards to fully render
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const tisCardClicked = await aisPage.evaluate(() => {
+                const debugInfo: string[] = [];
+                debugInfo.push('Starting TIS card search...');
+
+                // Find the TIS card - look for card elements containing TIS text
+                const allCards = Array.from(document.querySelectorAll('[class*="card"]'));
+                debugInfo.push(`Total card elements: ${allCards.length}`);
+
+                // Log all card texts for debugging
+                allCards.forEach((card, idx) => {
+                    const text = card.textContent?.trim() || '';
+                    debugInfo.push(`Card ${idx}: "${text.substring(0, 80)}..."`);
+                });
+
+                let tisCardCandidates: Array<{ el: Element, text: string, length: number }> = [];
+
+                for (const card of allCards) {
+                    const text = card.textContent?.trim() || '';
+                    const normalizedText = text.replace(/\s+/g, ' ');
+
+                    // Look for TIS card - more flexible matching
+                    // Must contain "Taxpayer Information Summary" OR "TIS"
+                    // Must NOT contain "Annual Information Statement" or just "AIS" alone
+                    const hasTISText = normalizedText.includes('Taxpayer Information Summary') ||
+                        (normalizedText.includes('TIS') && normalizedText.includes('Taxpayer'));
+                    const notAIS = !normalizedText.includes('Annual Information Statement') &&
+                        !(normalizedText.includes('AIS') && !normalizedText.includes('TIS'));
+
+                    if (hasTISText && notAIS) {
+                        tisCardCandidates.push({ el: card, text: normalizedText, length: text.length });
+                        debugInfo.push(`Found TIS candidate: length=${text.length}, text="${normalizedText.substring(0, 50)}..."`);
+                    }
+                }
+
+                debugInfo.push(`Found ${tisCardCandidates.length} TIS card candidates`);
+
+                // Sort by text length (smallest first) to get the most specific card
+                tisCardCandidates.sort((a, b) => a.length - b.length);
+
+                // Click the smallest (most specific) TIS card
+                if (tisCardCandidates.length > 0) {
+                    const tisCard = tisCardCandidates[0];
+                    debugInfo.push(`Clicking TIS card with text length: ${tisCard.length}`);
+
+                    if (tisCard.el instanceof HTMLElement) {
+                        tisCard.el.click();
+                        return { success: true, method: 'card-click', tag: tisCard.el.tagName, textLength: tisCard.length, debug: debugInfo };
+                    }
+                }
+
+                debugInfo.push('TIS card not found!');
+                return { success: false, error: 'TIS card not found', debug: debugInfo };
+            });
+
+            console.log('📋 [Puppeteer] TIS card click result:', JSON.stringify(tisCardClicked, null, 2));
+
+            if (!tisCardClicked.success) {
+                throw new Error(`TIS card not found: ${tisCardClicked.error || 'unknown error'}`);
+            }
+
+            console.log(`✅ [Puppeteer] TIS card clicked (method: ${tisCardClicked.method})`);
+
+            // Wait for navigation to TIS page
+            onProgress?.('Waiting for TIS page to load...');
+            console.log('⏳ [Puppeteer] Waiting for TIS page to load...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Check if we actually navigated
+            const tisPageUrl = aisPage.url();
+            console.log(`📍 [Puppeteer] Current URL after TIS click: ${tisPageUrl}`);
+
+            // Debug: Log all links on the page to find the correct TIS link
+            const linkDebug = await aisPage.evaluate(() => {
+                const links = Array.from(document.querySelectorAll('a'));
+                return links.map(link => ({
+                    text: link.textContent?.trim().substring(0, 50) || '',
+                    href: link.getAttribute('href') || '',
+                    classes: link.getAttribute('class') || ''
+                })).filter(link =>
+                    link.text.includes('TIS') || link.text.includes('Taxpayer')
+                );
+            });
+            console.log('📋 [Puppeteer] TIS-related links on page:', JSON.stringify(linkDebug, null, 2));
+
+            // Step 4: Select Financial Year from dropdown
+            onProgress?.(`Selecting financial year ${financialYear}...`);
+            console.log(`🔍 [Puppeteer] Selecting F.Y. ${financialYear} from dropdown...`);
+
+            try {
+                // Wait a bit for the page to fully load
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Find and click the F.Y. dropdown with detailed logging
+                const dropdownInfo = await aisPage.evaluate(() => {
+                    const debugInfo: string[] = [];
+
+                    // Look for app-dropdown-btn specifically
+                    const appDropdown = document.querySelector('app-dropdown-btn');
+                    if (appDropdown) {
+                        debugInfo.push('Found app-dropdown-btn element');
+                        const button = appDropdown.querySelector('button');
+                        if (button) {
+                            const text = button.textContent?.trim() || '';
+                            debugInfo.push(`Button text: "${text}"`);
+                            if (button instanceof HTMLElement) {
+                                button.click();
+                                return { success: true, method: 'app-dropdown-btn', text, debug: debugInfo };
+                            }
+                        }
+                    }
+
+                    // Fallback: look for any element with F.Y. text
+                    const allElements = Array.from(document.querySelectorAll('button, select, [role="combobox"]'));
+                    for (const el of allElements) {
+                        const text = el.textContent?.trim() || '';
+                        if (text.includes('F.Y.') && text.match(/20\d{2}-\d{2}/)) {
+                            debugInfo.push(`Found F.Y. element: "${text}"`);
+                            if (el instanceof HTMLElement) {
+                                el.click();
+                                return { success: true, method: 'fy-text-match', text, debug: debugInfo };
+                            }
+                        }
+                    }
+
+                    debugInfo.push('No F.Y. dropdown found');
+                    return { success: false, debug: debugInfo };
+                });
+
+                console.log('📋 [Puppeteer] Dropdown search result:', JSON.stringify(dropdownInfo, null, 2));
+
+                if (dropdownInfo.success) {
+                    console.log(`✅ [Puppeteer] Clicked F.Y. dropdown (${dropdownInfo.method})`);
+
+                    // Wait longer for dropdown overlay and options to appear and render
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+
+                    // Select the specific year - try twice if needed
+                    let optionResult: any = null;
+
+                    for (let attempt = 1; attempt <= 2; attempt++) {
+                        console.log(`🔍 [Puppeteer] Attempt ${attempt} to find F.Y. options...`);
+
+                        optionResult = await aisPage.evaluate((fy: string, attemptNum: number) => {
+                            const debugInfo: string[] = [];
+
+                            // Look for dropdown overlay
+                            const overlays = document.querySelectorAll('[class*="mat-select-panel"], [class*="cdk-overlay"], [class*="dropdown"], [role="listbox"]');
+                            debugInfo.push(`Found ${overlays.length} potential overlay elements`);
+
+                            let allOptions: Element[] = [];
+
+                            for (const overlay of overlays) {
+                                const isVisible = (overlay as HTMLElement).offsetParent !== null;
+                                if (isVisible) {
+                                    // Try standard option selectors AND button.dropdown-item (Bootstrap dropdowns)
+                                    const options = Array.from(overlay.querySelectorAll('mat-option, [role="option"], li, option, button.dropdown-item'));
+                                    allOptions = allOptions.concat(options);
+                                    debugInfo.push(`Found ${options.length} options in visible overlay`);
+
+                                    // If no options found, inspect the HTML structure
+                                    if (options.length === 0 && attemptNum === 1) {
+                                        const overlayHTML = (overlay as HTMLElement).innerHTML;
+                                        debugInfo.push(`Overlay HTML (first 500 chars): ${overlayHTML.substring(0, 500)}`);
+
+                                        // Try to find any clickable elements
+                                        const clickableElements = Array.from(overlay.querySelectorAll('div, span, a, button'));
+                                        debugInfo.push(`Found ${clickableElements.length} clickable elements in overlay`);
+
+                                        // Log first few elements
+                                        clickableElements.slice(0, 5).forEach((el, idx) => {
+                                            const text = el.textContent?.trim() || '';
+                                            const classes = el.getAttribute('class') || '';
+                                            debugInfo.push(`  Element ${idx}: tag=${el.tagName}, text="${text.substring(0, 30)}", classes="${classes.substring(0, 50)}"`);
+                                        });
+                                    }
+                                }
+                            }
+
+                            // Fallback: search entire document
+                            if (allOptions.length === 0) {
+                                allOptions = Array.from(document.querySelectorAll('mat-option, [role="option"]'));
+                                debugInfo.push(`Fallback: found ${allOptions.length} options in document`);
+                            }
+
+                            const optionTexts = allOptions.map(o => o.textContent?.trim()).slice(0, 10);
+                            debugInfo.push(`Option texts: ${JSON.stringify(optionTexts)}`);
+
+                            for (const option of allOptions) {
+                                const text = option.textContent?.trim() || '';
+                                if (text.includes(fy) || text === `F.Y. ${fy}` || text === fy) {
+                                    debugInfo.push(`Clicking option: "${text}"`);
+                                    if (option instanceof HTMLElement) {
+                                        option.click();
+                                        return { success: true, matched: text, debug: debugInfo };
+                                    }
+                                }
+                            }
+
+                            return { success: false, totalOptions: allOptions.length, optionTexts, debug: debugInfo };
+                        }, financialYear, attempt);
+
+                        console.log('📋 [Puppeteer] Option selection result:', JSON.stringify(optionResult, null, 2));
+
+                        if (optionResult.success) {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            console.log(`✅ [Puppeteer] Selected F.Y. ${financialYear}`);
+                            break; // Exit retry loop on success
+                        } else if (attempt < 2) {
+                            console.log(`⚠️ [Puppeteer] Attempt ${attempt} failed, waiting before retry...`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        } else {
+                            console.log(`⚠️ [Puppeteer] Could not find option for ${financialYear} after ${attempt} attempts`);
+                        }
+                    }
+                } else {
+                    console.log('⚠️ [Puppeteer] Could not find F.Y. dropdown');
+                }
+            } catch (error) {
+                console.log('⚠️ [Puppeteer] Error selecting F.Y.:', error);
+            }
+
+            // Note: TIS page loads with the current financial year by default
+            // F.Y. dropdown selection is not reliable, so we skip it and use whatever year is loaded
+            console.log('ℹ️ [Puppeteer] Using default financial year shown on TIS page');
+
+            // Step 5: Find and click Download button on TIS page
+
+            // Wait for navigation to TIS page
+            onProgress?.('Waiting for TIS page to load...');
+            console.log('⏳ [Puppeteer] Waiting for TIS page to load...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Step 5: Find and click Download button on TIS page
+            onProgress?.('Looking for Download button on TIS page...');
+            console.log('📥 [Puppeteer] Looking for Download button on TIS page...');
+
+            // Set up download handling BEFORE clicking download button
+            console.log(`📁 [Puppeteer] Setting up download to: ${downloadPath}`);
+            const cdpClient = await aisPage.target().createCDPSession();
+            await cdpClient.send('Page.setDownloadBehavior', {
+                behavior: 'allow',
+                downloadPath: downloadPath
+            });
+            console.log('✅ [Puppeteer] CDP download behavior configured');
+
+            const downloadButtonClicked = await aisPage.evaluate(() => {
+                // Look for Download button - it's usually a button with "Download" text or download icon
+                const allButtons = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+
+                for (const btn of allButtons) {
+                    const btnText = btn.textContent?.trim() || '';
+                    const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+                    const title = btn.getAttribute('title')?.toLowerCase() || '';
+                    const classes = btn.getAttribute('class') || '';
+
+                    // Check if this is a Download button
+                    const hasDownloadText = btnText.toLowerCase().includes('download');
+                    const hasDownloadAttr = ariaLabel.includes('download') || title.includes('download');
+                    const isPrimaryButton = classes.includes('primary') || classes.includes('mat-raised-button');
+
+                    if ((hasDownloadText || hasDownloadAttr) && btn instanceof HTMLElement) {
+                        console.log(`Found Download button: text="${btnText}", classes="${classes}"`);
+                        btn.click();
+                        return { success: true, text: btnText, classes };
+                    }
+                }
+
+                return { success: false, error: 'Download button not found' };
+            });
+
+            console.log('📋 [Puppeteer] Download button click result:', JSON.stringify(downloadButtonClicked, null, 2));
+
+            if (!downloadButtonClicked.success) {
+                throw new Error('Download button not found on TIS page');
+            }
+
+            console.log(`✅ [Puppeteer] Download button clicked: ${downloadButtonClicked.text}`);
+
+            // Wait for download modal to appear
+            onProgress?.('Waiting for download modal...');
+            console.log('⏳ [Puppeteer] Waiting for download modal to appear...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Click the Download button inside the modal
+            const modalDownloadClicked = await aisPage.evaluate(() => {
+                // Look for modal/dialog elements
+                const modals = document.querySelectorAll('[role="dialog"], [class*="modal"], [class*="dialog"]');
+
+                for (const modal of modals) {
+                    // Check if this modal is visible
+                    const isVisible = (modal as HTMLElement).offsetParent !== null;
+                    if (!isVisible) continue;
+
+                    // Look for Download button inside the modal
+                    const buttons = modal.querySelectorAll('button');
+                    for (const btn of buttons) {
+                        const text = btn.textContent?.trim() || '';
+                        if (text.toLowerCase().includes('download') && btn instanceof HTMLElement) {
+                            btn.click();
+                            return { success: true, text, location: 'modal' };
+                        }
+                    }
+                }
+
+                return { success: false, error: 'Modal download button not found' };
+            });
+
+            console.log('📋 [Puppeteer] Modal download button click result:', JSON.stringify(modalDownloadClicked, null, 2));
+
+            if (!modalDownloadClicked.success) {
+                console.log('⚠️ [Puppeteer] Modal download button not found, proceeding anyway...');
+            } else {
+                console.log(`✅ [Puppeteer] Modal download button clicked: ${modalDownloadClicked.text}`);
+            }
+
+            // Set up download handling
+            onProgress?.('Waiting for download to start...');
+            console.log('⏳ [Puppeteer] Waiting for download to start...');
+            console.log(`📂 [Puppeteer] Monitoring download directory: ${downloadPath}`);
+
+            // Wait for download to complete by monitoring the download directory
+            const fs = require('fs');
+            const path = require('path');
+
+            // Track existing files
+            let existingFiles: string[] = [];
+            try {
+                existingFiles = fs.readdirSync(downloadPath);
+            } catch (e) {
+                // Directory might not exist yet
+            }
+
+            let downloadedFile = null;
+            const maxWaitTime = 30000; // 30 seconds
+            const startTime = Date.now();
+
+            while (Date.now() - startTime < maxWaitTime) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                try {
+                    const files = fs.readdirSync(downloadPath);
+                    const newPdfFiles = files.filter((file: string) =>
+                        file.endsWith('.pdf') && !existingFiles.includes(file)
+                    );
+
+                    // Also check for recently modified existing files (in case browser overwrites)
+                    const recentlyModifiedFiles = files.filter((file: string) => {
+                        if (!file.endsWith('.pdf')) return false;
+                        const filePath = path.join(downloadPath, file);
+                        const stat = fs.statSync(filePath);
+                        const fileAge = Date.now() - stat.mtimeMs;
+                        return fileAge < 5000; // Modified in last 5 seconds
+                    });
+
+                    // Log what we're seeing every 5 seconds
+                    if ((Date.now() - startTime) % 5000 < 1000) {
+                        console.log(`📂 [Puppeteer] Checking download directory (${Math.round((Date.now() - startTime) / 1000)}s elapsed):`);
+                        console.log(`   Total files: ${files.length}, New PDFs: ${newPdfFiles.length}, Recently modified: ${recentlyModifiedFiles.length}`);
+                        if (files.length > 0) {
+                            console.log(`   Files: ${files.join(', ')}`);
+                        }
+                    }
+
+                    // Check new files first
+                    if (newPdfFiles.length > 0) {
+                        const pdfFile = newPdfFiles[0];
+                        const filePath = path.join(downloadPath, pdfFile);
+                        const stat = fs.statSync(filePath);
+
+                        // Check if file is complete (size > 0)
+                        if (stat.size > 0) {
+                            downloadedFile = pdfFile;
+                            console.log('✅ [Puppeteer] TIS file downloaded (new file):', downloadedFile);
+                            break;
+                        } else {
+                            console.log(`⏳ [Puppeteer] File ${pdfFile} found but size is 0, waiting...`);
+                        }
+                    }
+                    // Check recently modified files as fallback
+                    else if (recentlyModifiedFiles.length > 0) {
+                        const pdfFile = recentlyModifiedFiles[0];
+                        const filePath = path.join(downloadPath, pdfFile);
+                        const stat = fs.statSync(filePath);
+
+                        if (stat.size > 0) {
+                            downloadedFile = pdfFile;
+                            console.log('✅ [Puppeteer] TIS file downloaded (modified existing file):', downloadedFile);
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    // Directory might not exist yet or other error
+                    console.log(`⚠️ [Puppeteer] Error reading download directory: ${e}`);
+                }
+            }
+
+            if (downloadedFile) {
+                console.log('✅ [Puppeteer] TIS download completed successfully');
+
+                // Rename file with timestamp to make it unique (IST timezone)
+                const now = new Date();
+                const istDate = now.toLocaleString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                // Format: DD/MM/YYYY, HH:MM:SS -> DD-MM-YYYY_HH-MM-SS
+                const timestamp = istDate.replace(/\//g, '-').replace(', ', '_').replace(/:/g, '-');
+                const fileExt = path.extname(downloadedFile);
+                const fileBase = path.basename(downloadedFile, fileExt);
+                const newFileName = `${fileBase}_${timestamp}${fileExt}`;
+
+                const oldPath = path.join(downloadPath, downloadedFile);
+                const newPath = path.join(downloadPath, newFileName);
+
+                try {
+                    fs.renameSync(oldPath, newPath);
+                    console.log(`📝 [Puppeteer] Renamed file to: ${newFileName}`);
+                    downloadedFile = newFileName;
+                } catch (e) {
+                    console.log(`⚠️ [Puppeteer] Could not rename file: ${e}`);
+                    // Continue with original filename
+                }
+
+                onProgress?.('Download completed');
+
+                return {
+                    success: true,
+                    message: 'TIS downloaded successfully',
+                    filePath: path.join(downloadPath, downloadedFile)
+                };
+            } else {
+                // Fallback: Check if file was downloaded to default Downloads folder
+                console.log('⚠️ [Puppeteer] File not found in configured path, checking default Downloads folder...');
+                const defaultDownloadsPath = require('os').homedir() + '/Downloads';
+
+                try {
+                    const defaultFiles = fs.readdirSync(defaultDownloadsPath);
+                    console.log(`📂 [Puppeteer] Found ${defaultFiles.length} total files in Downloads folder`);
+
+                    const pdfFiles = defaultFiles.filter((file: string) => file.endsWith('.pdf'));
+                    console.log(`📄 [Puppeteer] Found ${pdfFiles.length} PDF files`);
+
+                    const recentPdfFiles = defaultFiles.filter((file: string) => {
+                        if (!file.endsWith('.pdf')) return false;
+                        const filePath = path.join(defaultDownloadsPath, file);
+                        const stat = fs.statSync(filePath);
+                        // Check if file was created in the last 60 seconds
+                        const fileAge = Date.now() - stat.mtimeMs;
+                        const isTIS = file.toLowerCase().includes('tis');
+
+                        console.log(`  📄 ${file}: age=${Math.round(fileAge / 1000)}s, isTIS=${isTIS}`);
+
+                        return fileAge < 60000 && isTIS;
+                    });
+
+                    console.log(`✅ [Puppeteer] Found ${recentPdfFiles.length} recent TIS PDF files`);
+
+                    if (recentPdfFiles.length > 0) {
+                        const foundFile = recentPdfFiles[0];
+                        console.log(`✅ [Puppeteer] Found TIS file in default Downloads: ${foundFile}`);
+                        return {
+                            success: true,
+                            message: 'TIS downloaded successfully (found in default Downloads folder)',
+                            filePath: path.join(defaultDownloadsPath, foundFile)
+                        };
+                    }
+                } catch (e) {
+                    console.log('⚠️ [Puppeteer] Could not check default Downloads folder:', e);
+                }
+
+                throw new Error('Download timeout - file not found after 30 seconds');
+            }
+        } catch (error: any) {
+            console.error('❌ [Puppeteer] TIS Download error:', error);
+            onProgress?.('❌ ' + error.message);
+            throw error;
+        } finally {
+            // Always close the browser, even if there was an error
+            try {
+                await browser.close();
+                console.log('🔒 [Puppeteer] Browser closed');
+            } catch (e) {
+                console.log('⚠️ [Puppeteer] Error closing browser:', e);
+            }
+        }
+    }
+
+    /**
+     * Logout and clear cookies
+     */
     async logout(cookies: any[]): Promise<{ success: boolean; message?: string }> {
         console.log('🚪 [Puppeteer] Logout started');
         const browser = await puppeteer.launch({

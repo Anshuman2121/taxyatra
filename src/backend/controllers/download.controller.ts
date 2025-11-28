@@ -120,6 +120,64 @@ export function registerDownloadHandlers() {
         }
     });
 
+    ipcMain.handle('download:tis', async (event, pan: string, password: string, financialYear: string) => {
+        console.log('📥 [Download Controller] TIS download requested for PAN:', pan, 'F.Y.:', financialYear);
+
+        try {
+            // Create download directory: /Downloads/TaxYatra/{PAN}/{AssessmentYear}/TIS/
+            // Convert F.Y. to Assessment Year (e.g., "2024-25" -> "2025-26")
+            const [startYear, endYear] = financialYear.split('-');
+            const assessmentYear = `20${endYear}-${(parseInt(endYear) + 1).toString().padStart(2, '0')}`;
+
+            const downloadsDir = path.join(
+                app.getPath('downloads'),
+                'TaxYatra',
+                pan,
+                assessmentYear,
+                'TIS'
+            );
+
+            if (!fs.existsSync(downloadsDir)) {
+                fs.mkdirSync(downloadsDir, { recursive: true });
+                console.log('📁 [Download Controller] Created download directory:', downloadsDir);
+            }
+
+            // Download TIS (login happens within the same browser session)
+            console.log('📥 [Download Controller] Starting TIS download with login...');
+            const result = await puppeteerService.downloadTIS(
+                pan,
+                password,
+                financialYear,
+                downloadsDir,
+                event,
+                (status: string) => {
+                    console.log('📊 [Download Controller] Download progress:', status);
+                }
+            );
+
+            if (result.success) {
+                console.log('✅ [Download Controller] TIS downloaded successfully:', result.filePath);
+                return {
+                    success: true,
+                    filePath: result.filePath,
+                    message: 'TIS downloaded successfully'
+                };
+            } else {
+                console.error('❌ [Download Controller] TIS download failed:', result.message);
+                return {
+                    success: false,
+                    message: result.message || 'Download failed'
+                };
+            }
+        } catch (error: any) {
+            console.error('❌ [Download Controller] Error downloading TIS:', error);
+            return {
+                success: false,
+                message: error.message || 'Unknown error occurred'
+            };
+        }
+    });
+
     ipcMain.handle('download:get-path', async (_, pan: string) => {
         const downloadsDir = path.join(app.getPath('downloads'), 'TaxYatra', '26AS', pan);
         return downloadsDir;
