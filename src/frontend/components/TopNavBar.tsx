@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { OnlineStatus } from './OnlineStatus';
+import { BrowserSelector } from './BrowserSelector';
 import { LicenseDetailsModal } from './LicenseDetailsModal';
 import { Key } from 'lucide-react';
 import {
@@ -80,6 +81,7 @@ export function TopNavBar({ pageName, onBack }: TopNavBarProps) {
                 </Select>
               </div>
             )}
+            <BrowserSelector />
             <button
               onClick={() => setShowLicenseModal(true)}
               className="p-1.5 hover:bg-amber-100/50 rounded-lg transition-colors"

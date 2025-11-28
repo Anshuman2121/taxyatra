@@ -31,5 +31,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Captcha dialog events
   onCaptchaRequired: (callback: (event: any, data: { image: string }) => void) => ipcRenderer.on('download:captcha-required', callback),
   sendCaptchaResponse: (text: string, cancelled: boolean) => ipcRenderer.send('download:captcha-response', { text, cancelled }),
-  removeAllCaptchaListeners: () => ipcRenderer.removeAllListeners('download:captcha-required')
+  removeAllCaptchaListeners: () => ipcRenderer.removeAllListeners('download:captcha-required'),
+  // Browser API
+  detectBrowsers: () => ipcRenderer.invoke('browser:detect'),
+  selectBrowser: (browserPath: string) => ipcRenderer.invoke('browser:select', browserPath),
+  getSelectedBrowser: () => ipcRenderer.invoke('browser:get-selected'),
+  clearBrowserSelection: () => ipcRenderer.invoke('browser:clear')
 });

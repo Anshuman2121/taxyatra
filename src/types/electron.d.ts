@@ -27,6 +27,18 @@ export interface ElectronAPI {
   onCaptchaRequired: (callback: (event: any, data: { image: string }) => void) => void;
   sendCaptchaResponse: (text: string, cancelled: boolean) => void;
   removeAllCaptchaListeners: () => void;
+  // Browser API
+  detectBrowsers: () => Promise<{ success: boolean; browsers: BrowserInfo[]; message?: string }>;
+  selectBrowser: (browserPath: string) => Promise<{ success: boolean; message: string }>;
+  getSelectedBrowser: () => Promise<{ success: boolean; browser: BrowserInfo | null; message?: string }>;
+  clearBrowserSelection: () => Promise<{ success: boolean; message?: string }>;
+}
+
+export interface BrowserInfo {
+  name: string;
+  id: string;
+  path: string;
+  icon?: string;
 }
 
 declare global {

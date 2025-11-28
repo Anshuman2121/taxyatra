@@ -1,11 +1,25 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { browserService } from './browser.service';
 // import { Browser, Page } from 'puppeteer';
 
 puppeteer.use(StealthPlugin());
 
 export class PuppeteerService {
     private abortController: AbortController | null = null;
+
+    private getLaunchOptions() {
+        const executablePath = browserService.getSelectedBrowser();
+        const options: any = {
+            headless: false, // TEMPORARILY DISABLED: Set to true to hide browser
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+        };
+        if (executablePath) {
+            options.executablePath = executablePath;
+            console.log('🌐 [Puppeteer] Using browser:', executablePath);
+        }
+        return options;
+    }
 
     async login(pan: string, password: string, onProgress?: (status: string) => void): Promise<{ success: boolean; cookies?: any[]; authToken?: string; message?: string }> {
         console.log('🤖 [Puppeteer] Login started for PAN:', pan);
@@ -14,10 +28,7 @@ export class PuppeteerService {
 
         onProgress?.('Starting browser...');
 
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
-        });
+        const browser = await puppeteer.launch(this.getLaunchOptions());
 
         try {
             if (this.abortController.signal.aborted) throw new Error('Cancelled');
@@ -356,10 +367,7 @@ export class PuppeteerService {
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         console.log('📥 [Puppeteer] 26AS Download started for AY:', assessmentYear);
 
-        const browser = await puppeteer.launch({
-            headless: true, // Show browser for debugging
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        const browser = await puppeteer.launch(this.getLaunchOptions());
 
         try {
             const page = await browser.newPage();
@@ -714,12 +722,12 @@ export class PuppeteerService {
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         console.log('📥 [Puppeteer] AIS Download started for F.Y.:', financialYear);
 
+        const launchOpts = this.getLaunchOptions();
         const browser = await puppeteer.launch({
+            ...launchOpts,
             headless: false, // Show browser for debugging and captcha entry
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
+                ...(launchOpts.args || []),
                 '--start-maximized'
             ],
             defaultViewport: null, // Use full window size
@@ -1691,12 +1699,12 @@ export class PuppeteerService {
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         console.log('📥 [Puppeteer] TIS Download started for F.Y.:', financialYear);
 
+        const launchOpts = this.getLaunchOptions();
         const browser = await puppeteer.launch({
+            ...launchOpts,
             headless: false,
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
+                ...(launchOpts.args || []),
                 '--start-maximized'
             ],
             defaultViewport: null,
@@ -2489,10 +2497,7 @@ export class PuppeteerService {
      */
     async logout(cookies: any[]): Promise<{ success: boolean; message?: string }> {
         console.log('🚪 [Puppeteer] Logout started');
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        const browser = await puppeteer.launch(this.getLaunchOptions());
 
         try {
             const page = await browser.newPage();

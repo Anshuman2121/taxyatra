@@ -6,14 +6,14 @@ export function OnlineStatus() {
 
   const checkConnectivity = async () => {
     try {
-      const response = await fetch('https://1.1.1.1', {
+      await fetch('https://1.1.1.1', {
         method: 'HEAD',
         mode: 'no-cors',
         cache: 'no-cache',
         signal: AbortSignal.timeout(3000)
       });
       setIsOnline(true);
-    } catch (error) {
+    } catch {
       setIsOnline(false);
     }
   };

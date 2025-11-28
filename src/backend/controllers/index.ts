@@ -2,6 +2,7 @@ import { registerAuthHandlers } from './auth.controller';
 import { registerUserHandlers } from './user.controller';
 import { registerRegistrationHandlers } from './registration.controller';
 import { registerDownloadHandlers } from './download.controller';
+import { registerBrowserHandlers } from './browser.controller';
 
 export function registerIpcHandlers() {
     try {
@@ -14,6 +15,8 @@ export function registerIpcHandlers() {
         console.log('✅ [Controllers] Registration handlers registered');
         registerDownloadHandlers();
         console.log('✅ [Controllers] Download handlers registered');
+        registerBrowserHandlers();
+        console.log('✅ [Controllers] Browser handlers registered');
     } catch (error) {
         console.error('❌ [Controllers] Failed to register IPC handlers:', error);
         throw error;
