@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   revokeLicense: () => ipcRenderer.invoke('registration:revoke'),
   // Download API
   download26AS: (pan: string, password: string, assessmentYear: string) => ipcRenderer.invoke('download:26as', pan, password, assessmentYear),
-  downloadAIS: (pan: string, password: string) => ipcRenderer.invoke('download:ais', pan, password),
+  downloadAIS: (pan: string, password: string, financialYear: string) => ipcRenderer.invoke('download:ais', pan, password, financialYear),
   downloadTIS: (pan: string, password: string, financialYear: string) => ipcRenderer.invoke('download:tis', pan, password, financialYear),
   getDownloadPath: (pan: string) => ipcRenderer.invoke('download:get-path', pan),
   // Captcha dialog events
