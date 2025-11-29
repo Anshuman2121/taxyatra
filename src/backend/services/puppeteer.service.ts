@@ -512,106 +512,153 @@ export class PuppeteerService {
                 console.log('⚠️ [Puppeteer] Error checking for dialog:', error);
             }
 
-            // If dialog was dismissed, re-click e-File menu as it may have closed
-            if (dialogWasDismissed) {
-                console.log('🔄 [Puppeteer] Re-opening e-File menu after dialog dismissal...');
+            // ============================================
+            // NESTED MENU NAVIGATION: e-File -> Income Tax Returns -> View Form 26AS
+            // Using Puppeteer's native mouse actions for reliable hover
+            // ============================================
+            onProgress?.('Navigating to View Form 26AS...');
+
+            // Step 1: Find and click "e-File" menu using mouse
+            console.log('🔍 [Puppeteer] Step 1: Clicking e-File menu...');
+
+            // Find e-File button position and click using mouse
+            const eFileBox = await page.evaluate(() => {
+                const allElements = Array.from(document.querySelectorAll('a, button, span, li, div'));
+                const eFileBtn = allElements.find(el => {
+                    const text = el.textContent?.trim() || '';
+                    return text === 'e-File';
+                });
+
+                if (eFileBtn) {
+                    const rect = eFileBtn.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
+                }
+                return null;
+            });
+
+            if (eFileBox && eFileBox.found) {
+                console.log('✅ [Puppeteer] Found e-File at:', eFileBox.x, eFileBox.y);
+                await page.mouse.click(eFileBox.x, eFileBox.y);
+            } else {
+                // Fallback: click via evaluate
                 await page.evaluate(() => {
-                    const menuItems = Array.from(document.querySelectorAll('*'));
-                    const eFileMenu = menuItems.find(el => el.textContent?.trim() === 'e-File');
-                    if (eFileMenu && eFileMenu instanceof HTMLElement) {
-                        console.log('✅ Re-clicking e-File menu');
-                        eFileMenu.click();
+                    const allElements = Array.from(document.querySelectorAll('a, button, span, li, div'));
+                    const eFileBtn = allElements.find(el => el.textContent?.trim() === 'e-File');
+                    if (eFileBtn && eFileBtn instanceof HTMLElement) {
+                        eFileBtn.click();
+                        console.log('✅ Clicked e-File via evaluate');
                     }
                 });
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            } else {
-                await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
-            // Step 1: Hover over Income Tax Returns to open submenu
-            onProgress?.('Navigating to Income Tax Returns...');
-            console.log('🔍 [Puppeteer] Looking for Income Tax Returns menu item...');
+            // Wait for dropdown to appear
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
-            const itrHovered = await page.evaluate(() => {
-                const menuItems = Array.from(document.querySelectorAll('*'));
-                const itrMenu = menuItems.find(el => {
+            // Step 2: Hover over "Income Tax Returns" using Puppeteer's mouse
+            console.log('🔍 [Puppeteer] Step 2: Hovering over Income Tax Returns...');
+
+            // Find the Income Tax Returns element and get its bounding box
+            const itrBoundingBox = await page.evaluate(() => {
+                // Look in overlay container first
+                const overlay = document.querySelector('.cdk-overlay-container');
+                const searchRoot = overlay || document;
+
+                const menuItems = Array.from(searchRoot.querySelectorAll('button, a, span, div'));
+                const itrItem = menuItems.find(el => {
                     const text = el.textContent?.trim() || '';
                     return text === 'Income Tax Returns';
                 });
 
-                if (!itrMenu || !(itrMenu instanceof HTMLElement)) {
-                    return false;
+                if (itrItem) {
+                    const rect = itrItem.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
                 }
-
-                console.log('✅ Found Income Tax Returns menu item');
-
-                // Trigger mouseenter event to show submenu
-                const mouseEnterEvent = new MouseEvent('mouseenter', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                });
-                itrMenu.dispatchEvent(mouseEnterEvent);
-                itrMenu.click();
-                return true;
+                return null;
             });
 
-            if (!itrHovered) {
-                throw new Error('Income Tax Returns menu not found');
+            if (itrBoundingBox && itrBoundingBox.found) {
+                console.log('✅ [Puppeteer] Found Income Tax Returns at:', itrBoundingBox.x, itrBoundingBox.y);
+
+                // Use Puppeteer's mouse to hover - this is more reliable than JS events
+                await page.mouse.move(itrBoundingBox.x, itrBoundingBox.y);
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // Move mouse slightly to trigger hover state
+                await page.mouse.move(itrBoundingBox.x + 5, itrBoundingBox.y);
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            } else {
+                throw new Error('Income Tax Returns menu item not found');
             }
 
-            console.log('✅ [Puppeteer] Hovered over Income Tax Returns');
-
-            // Step 2: Wait for View Form 26AS link to appear (asynchronous wait)
+            // Step 3: Wait for submenu and click "View Form 26AS"
             onProgress?.('Waiting for submenu to load...');
-            console.log('🔍 [Puppeteer] Waiting for View Form 26AS link to appear...');
+            console.log('🔍 [Puppeteer] Step 3: Looking for View Form 26AS...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            try {
-                await page.waitForFunction(
-                    () => {
-                        const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
-                        return allElements.some(el => {
-                            const text = el.textContent?.trim() || '';
-                            return text === 'View Form 26AS' || text.includes('View Form 26AS');
-                        });
-                    },
-                    { timeout: 5000 }
-                );
-                console.log('✅ [Puppeteer] View Form 26AS link appeared');
-            } catch (error) {
-                console.log('❌ [Puppeteer] Timeout waiting for View Form 26AS link');
-                throw new Error('View Form 26AS link did not appear after hovering');
-            }
+            // Find View Form 26AS and get its position
+            const view26ASBox = await page.evaluate(() => {
+                // Look in overlay container
+                const overlay = document.querySelector('.cdk-overlay-container');
+                const searchRoot = overlay || document;
 
-            // Step 3: Click View Form 26AS immediately
-            onProgress?.('Clicking View Form 26AS...');
-            const view26ASClicked = await page.evaluate(() => {
-                const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
-
-                // Try exact match first
-                let view26AS = allElements.find(el => {
+                const allItems = Array.from(searchRoot.querySelectorAll('button, a, span, div'));
+                const view26AS = allItems.find(el => {
                     const text = el.textContent?.trim() || '';
                     return text === 'View Form 26AS';
                 });
 
-                // If not found, try partial match
-                if (!view26AS) {
-                    view26AS = allElements.find(el => {
-                        const text = el.textContent?.trim() || '';
-                        return text.includes('View Form 26AS');
-                    });
+                if (view26AS) {
+                    const rect = view26AS.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
                 }
 
-                if (view26AS && view26AS instanceof HTMLElement) {
-                    console.log('✅ Clicking View Form 26AS:', view26AS.textContent?.trim());
-                    view26AS.click();
-                    return true;
-                }
-                return false;
+                // Log available items for debugging
+                const availableItems = allItems
+                    .map(el => el.textContent?.trim())
+                    .filter(t => t && t.length > 0 && t.length < 50);
+                console.log('📋 Available menu items:', availableItems.slice(0, 20));
+                return null;
             });
 
-            if (!view26ASClicked) {
-                throw new Error('Failed to click View Form 26AS link');
+            if (view26ASBox && view26ASBox.found) {
+                console.log('✅ [Puppeteer] Found View Form 26AS, clicking at:', view26ASBox.x, view26ASBox.y);
+
+                // Use Puppeteer's mouse to click
+                await page.mouse.click(view26ASBox.x, view26ASBox.y);
+            } else {
+                // Fallback: try clicking via evaluate
+                const clicked = await page.evaluate(() => {
+                    const overlay = document.querySelector('.cdk-overlay-container');
+                    const searchRoot = overlay || document;
+
+                    const allItems = Array.from(searchRoot.querySelectorAll('button, a, span, div'));
+                    const view26AS = allItems.find(el => {
+                        const text = el.textContent?.trim() || '';
+                        return text === 'View Form 26AS' || text.includes('View Form 26AS');
+                    });
+
+                    if (view26AS && view26AS instanceof HTMLElement) {
+                        view26AS.click();
+                        return true;
+                    }
+                    return false;
+                });
+
+                if (!clicked) {
+                    throw new Error('View Form 26AS link not found in submenu');
+                }
             }
 
             console.log('✅ [Puppeteer] Successfully clicked View Form 26AS');
