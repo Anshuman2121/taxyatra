@@ -477,11 +477,61 @@ export class PuppeteerService {
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Hover over "Income Tax Returns" submenu - this opens a nested panel
+            // Check for and dismiss logout confirmation dialog if it appears
+            onProgress?.('Checking for dialogs...');
+            let dialogWasDismissed = false;
+            try {
+                const dialogDismissed = await page.evaluate(() => {
+                    // Look for logout confirmation dialog
+                    const allText = document.body.innerText;
+                    if (allText.includes('Are you sure you want to Logout?')) {
+                        console.log('⚠️ Logout dialog detected, clicking No...');
+
+                        // Find and click the "No" button
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const noButton = buttons.find(btn => {
+                            const text = btn.textContent?.trim() || '';
+                            return text === 'No' || text === 'NO';
+                        });
+
+                        if (noButton && noButton instanceof HTMLElement) {
+                            noButton.click();
+                            console.log('✅ Clicked No on logout dialog');
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+
+                if (dialogDismissed) {
+                    console.log('✅ [Puppeteer] Dismissed logout dialog');
+                    dialogWasDismissed = true;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (error) {
+                console.log('⚠️ [Puppeteer] Error checking for dialog:', error);
+            }
+
+            // If dialog was dismissed, re-click e-File menu as it may have closed
+            if (dialogWasDismissed) {
+                console.log('🔄 [Puppeteer] Re-opening e-File menu after dialog dismissal...');
+                await page.evaluate(() => {
+                    const menuItems = Array.from(document.querySelectorAll('*'));
+                    const eFileMenu = menuItems.find(el => el.textContent?.trim() === 'e-File');
+                    if (eFileMenu && eFileMenu instanceof HTMLElement) {
+                        console.log('✅ Re-clicking e-File menu');
+                        eFileMenu.click();
+                    }
+                });
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            // Step 1: Hover over Income Tax Returns to open submenu
             onProgress?.('Navigating to Income Tax Returns...');
             console.log('🔍 [Puppeteer] Looking for Income Tax Returns menu item...');
 
-            // First, try to find and hover over the Income Tax Returns element
             const itrHovered = await page.evaluate(() => {
                 const menuItems = Array.from(document.querySelectorAll('*'));
                 const itrMenu = menuItems.find(el => {
@@ -489,40 +539,53 @@ export class PuppeteerService {
                     return text === 'Income Tax Returns';
                 });
 
-                if (itrMenu && itrMenu instanceof HTMLElement) {
-                    console.log('✅ Found Income Tax Returns menu item');
-                    // Trigger mouseenter event to show submenu
-                    const mouseEnterEvent = new MouseEvent('mouseenter', {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    itrMenu.dispatchEvent(mouseEnterEvent);
-
-                    // Also try click as backup
-                    itrMenu.click();
-                    return true;
+                if (!itrMenu || !(itrMenu instanceof HTMLElement)) {
+                    return false;
                 }
-                console.log('❌ Income Tax Returns menu item not found');
-                return false;
+
+                console.log('✅ Found Income Tax Returns menu item');
+
+                // Trigger mouseenter event to show submenu
+                const mouseEnterEvent = new MouseEvent('mouseenter', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                itrMenu.dispatchEvent(mouseEnterEvent);
+                itrMenu.click();
+                return true;
             });
 
             if (!itrHovered) {
-                console.log('⚠️ [Puppeteer] Income Tax Returns menu item not found');
-            } else {
-                console.log('✅ [Puppeteer] Hovered over Income Tax Returns');
+                throw new Error('Income Tax Returns menu not found');
             }
 
-            // Wait longer for the nested submenu panel animation to complete
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            console.log('✅ [Puppeteer] Hovered over Income Tax Returns');
 
-            // Click on "View Form 26AS" - this opens a NEW TAB
+            // Step 2: Wait for View Form 26AS link to appear (asynchronous wait)
+            onProgress?.('Waiting for submenu to load...');
+            console.log('🔍 [Puppeteer] Waiting for View Form 26AS link to appear...');
+
+            try {
+                await page.waitForFunction(
+                    () => {
+                        const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
+                        return allElements.some(el => {
+                            const text = el.textContent?.trim() || '';
+                            return text === 'View Form 26AS' || text.includes('View Form 26AS');
+                        });
+                    },
+                    { timeout: 5000 }
+                );
+                console.log('✅ [Puppeteer] View Form 26AS link appeared');
+            } catch (error) {
+                console.log('❌ [Puppeteer] Timeout waiting for View Form 26AS link');
+                throw new Error('View Form 26AS link did not appear after hovering');
+            }
+
+            // Step 3: Click View Form 26AS immediately
             onProgress?.('Clicking View Form 26AS...');
-            console.log('🔍 [Puppeteer] Looking for View Form 26AS link...');
-
-            // Find and click immediately in a single operation to prevent menu from closing
             const view26ASClicked = await page.evaluate(() => {
-                // Try multiple selectors
                 const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
 
                 // Try exact match first
@@ -539,27 +602,19 @@ export class PuppeteerService {
                     });
                 }
 
-                // If still not found, try looking for just "26AS" in links
-                if (!view26AS) {
-                    const links = Array.from(document.querySelectorAll('a'));
-                    view26AS = links.find(link => {
-                        const text = link.textContent?.trim() || '';
-                        return text.includes('26AS') && text.includes('View');
-                    });
-                }
-
                 if (view26AS && view26AS instanceof HTMLElement) {
                     console.log('✅ Clicking View Form 26AS:', view26AS.textContent?.trim());
                     view26AS.click();
                     return true;
                 }
-                console.log('❌ View Form 26AS link not found');
                 return false;
             });
 
             if (!view26ASClicked) {
-                throw new Error('View Form 26AS link not found after hovering over Income Tax Returns');
+                throw new Error('Failed to click View Form 26AS link');
             }
+
+            console.log('✅ [Puppeteer] Successfully clicked View Form 26AS');
 
             // Wait for new TRACES tab to open
             onProgress?.('Waiting for TRACES tab...');
