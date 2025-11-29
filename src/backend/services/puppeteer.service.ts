@@ -349,16 +349,25 @@ export class PuppeteerService {
     }
 
     async download26AS(
-        cookies: any[],
+        pan: string,
+        password: string,
         assessmentYear: string,
         downloadPath: string,
+        event: Electron.IpcMainInvokeEvent,
         onProgress?: (status: string) => void
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         console.log('📥 [Puppeteer] 26AS Download started for AY:', assessmentYear);
 
         const browser = await puppeteer.launch({
-            headless: true, // Show browser for debugging
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: false, // Show browser for user visibility
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--start-maximized'
+            ],
+            defaultViewport: null,
+            devtools: false
         });
 
         try {
@@ -371,17 +380,73 @@ export class PuppeteerService {
                 downloadPath: downloadPath
             });
 
-            // Set cookies to maintain session
-            onProgress?.('Setting up session...');
-            for (const cookie of cookies) {
-                try {
-                    await page.setCookie(cookie);
-                } catch (e) {
-                    console.log('⚠️ [Puppeteer] Cookie set error:', e);
-                }
+            // Step 1: Login first in this browser session
+            onProgress?.('Logging in to Income Tax portal...');
+
+            // Navigate to login page
+            await page.goto('https://eportal.incometax.gov.in/iec/foservices/#/login', {
+                waitUntil: 'networkidle0',
+                timeout: 60000
+            });
+
+            const currentUrl = page.url();
+            console.log('📍 [Puppeteer] Navigated to login page, URL:', currentUrl);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Enter PAN
+            console.log('🔍 [Puppeteer] Looking for PAN input field...');
+            await page.waitForSelector('#panAdhaarUserId', { timeout: 15000 });
+            console.log('✅ [Puppeteer] Found PAN input field');
+            await page.type('#panAdhaarUserId', pan);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Click Continue
+            await page.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const continueBtn = btns.find(b => b.textContent?.includes('Continue'));
+                if (continueBtn) continueBtn.click();
+            });
+            await new Promise(resolve => setTimeout(resolve, 4000));
+
+            // Check secure access checkbox
+            await page.waitForSelector('#passwordCheckBox-input', { timeout: 10000 });
+            await page.click('#passwordCheckBox-input');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Enter password
+            await page.waitForSelector('#loginPasswordField', { timeout: 10000 });
+            await page.type('#loginPasswordField', password);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Click Login button
+            await page.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const loginBtn = btns.find(b => b.textContent?.includes('Continue'));
+                if (loginBtn) loginBtn.click();
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Check for dual login
+            const pageText = await page.evaluate(() => document.body.innerText);
+            if (pageText.includes('Dual Login') || (pageText.includes('session') && pageText.includes('active'))) {
+                console.log('⚠️ [Puppeteer] Dual login detected, handling...');
+                await page.evaluate(() => {
+                    const buttons = Array.from(document.querySelectorAll('button, a'));
+                    const loginHereBtn = buttons.find(el => {
+                        const text = el.textContent?.trim() || '';
+                        return text.toLowerCase().includes('login here');
+                    });
+                    if (loginHereBtn && loginHereBtn instanceof HTMLElement) {
+                        loginHereBtn.click();
+                    }
+                });
+                await new Promise(resolve => setTimeout(resolve, 3000));
             }
 
-            // Navigate to dashboard
+            console.log('✅ [Puppeteer] Login successful, continuing with 26AS download');
+
+            // Step 2: Navigate to dashboard
             onProgress?.('Navigating to dashboard...');
             await page.goto('https://eportal.incometax.gov.in/iec/foservices/#/dashboard', {
                 waitUntil: 'networkidle0',
@@ -390,34 +455,8 @@ export class PuppeteerService {
 
             await new Promise(resolve => setTimeout(resolve, 3000));
 
-            // Click on e-File menu
-            onProgress?.('Opening e-File menu...');
-            await page.evaluate(() => {
-                const menuItems = Array.from(document.querySelectorAll('*'));
-                const eFileMenu = menuItems.find(el => el.textContent?.trim() === 'e-File');
-                if (eFileMenu && eFileMenu instanceof HTMLElement) {
-                    eFileMenu.click();
-                }
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Click on "Income Tax Returns" submenu
-            onProgress?.('Navigating to Income Tax Returns...');
-            await page.evaluate(() => {
-                const menuItems = Array.from(document.querySelectorAll('*'));
-                const itrMenu = menuItems.find(el => el.textContent?.trim() === 'Income Tax Returns');
-                if (itrMenu && itrMenu instanceof HTMLElement) {
-                    itrMenu.click();
-                }
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Click on "View Form 26AS" - this opens a NEW TAB
-            onProgress?.('Clicking View Form 26AS...');
-
-            // Set up listener for new tab BEFORE clicking
+            // Set up listener for new TRACES tab BEFORE clicking
+            onProgress?.('Setting up for TRACES navigation...');
             const newTabPromise = new Promise<any>((resolve) => {
                 browser.once('targetcreated', async (target) => {
                     const newPage = await target.page();
@@ -425,15 +464,102 @@ export class PuppeteerService {
                 });
             });
 
-            // Click the link
+            // Click on e-File menu
+            onProgress?.('Opening e-File menu...');
             await page.evaluate(() => {
-                const links = Array.from(document.querySelectorAll('*'));
-                const view26AS = links.find(el => el.textContent?.includes('View Form 26AS'));
-                if (view26AS && view26AS instanceof HTMLElement) {
-                    console.log('✅ Clicking View Form 26AS');
-                    view26AS.click();
+                const menuItems = Array.from(document.querySelectorAll('*'));
+                const eFileMenu = menuItems.find(el => el.textContent?.trim() === 'e-File');
+                if (eFileMenu && eFileMenu instanceof HTMLElement) {
+                    console.log('✅ Clicking e-File menu');
+                    eFileMenu.click();
                 }
             });
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Hover over "Income Tax Returns" submenu - this opens a nested panel
+            onProgress?.('Navigating to Income Tax Returns...');
+            console.log('🔍 [Puppeteer] Looking for Income Tax Returns menu item...');
+
+            // First, try to find and hover over the Income Tax Returns element
+            const itrHovered = await page.evaluate(() => {
+                const menuItems = Array.from(document.querySelectorAll('*'));
+                const itrMenu = menuItems.find(el => {
+                    const text = el.textContent?.trim() || '';
+                    return text === 'Income Tax Returns';
+                });
+
+                if (itrMenu && itrMenu instanceof HTMLElement) {
+                    console.log('✅ Found Income Tax Returns menu item');
+                    // Trigger mouseenter event to show submenu
+                    const mouseEnterEvent = new MouseEvent('mouseenter', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    itrMenu.dispatchEvent(mouseEnterEvent);
+
+                    // Also try click as backup
+                    itrMenu.click();
+                    return true;
+                }
+                console.log('❌ Income Tax Returns menu item not found');
+                return false;
+            });
+
+            if (!itrHovered) {
+                console.log('⚠️ [Puppeteer] Income Tax Returns menu item not found');
+            } else {
+                console.log('✅ [Puppeteer] Hovered over Income Tax Returns');
+            }
+
+            // Wait longer for the nested submenu panel animation to complete
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Click on "View Form 26AS" - this opens a NEW TAB
+            onProgress?.('Clicking View Form 26AS...');
+            console.log('🔍 [Puppeteer] Looking for View Form 26AS link...');
+
+            // Find and click immediately in a single operation to prevent menu from closing
+            const view26ASClicked = await page.evaluate(() => {
+                // Try multiple selectors
+                const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
+
+                // Try exact match first
+                let view26AS = allElements.find(el => {
+                    const text = el.textContent?.trim() || '';
+                    return text === 'View Form 26AS';
+                });
+
+                // If not found, try partial match
+                if (!view26AS) {
+                    view26AS = allElements.find(el => {
+                        const text = el.textContent?.trim() || '';
+                        return text.includes('View Form 26AS');
+                    });
+                }
+
+                // If still not found, try looking for just "26AS" in links
+                if (!view26AS) {
+                    const links = Array.from(document.querySelectorAll('a'));
+                    view26AS = links.find(link => {
+                        const text = link.textContent?.trim() || '';
+                        return text.includes('26AS') && text.includes('View');
+                    });
+                }
+
+                if (view26AS && view26AS instanceof HTMLElement) {
+                    console.log('✅ Clicking View Form 26AS:', view26AS.textContent?.trim());
+                    view26AS.click();
+                    return true;
+                }
+                console.log('❌ View Form 26AS link not found');
+                return false;
+            });
+
+            if (!view26ASClicked) {
+                throw new Error('View Form 26AS link not found after hovering over Income Tax Returns');
+            }
 
             // Wait for new TRACES tab to open
             onProgress?.('Waiting for TRACES tab...');
@@ -441,7 +567,7 @@ export class PuppeteerService {
             try {
                 tracesPage = await Promise.race([
                     newTabPromise,
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('TRACES tab timeout')), 10000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('TRACES tab timeout')), 15000))
                 ]);
                 console.log('✅ [Puppeteer] TRACES tab opened');
             } catch (error) {
@@ -469,8 +595,10 @@ export class PuppeteerService {
             await new Promise(resolve => setTimeout(resolve, 5000));
 
             // Check if we're on TRACES page and accept terms
-            const currentUrl = tracesPage.url();
-            if (currentUrl.includes('tdscpc.gov.in')) {
+            const tracesUrl = tracesPage.url();
+            console.log('📍 [Puppeteer] TRACES page URL:', tracesUrl);
+
+            if (tracesUrl.includes('tdscpc.gov.in') || tracesUrl.includes('traces')) {
                 console.log('✅ [Puppeteer] On TRACES page');
                 onProgress?.('Accepting TRACES terms...');
 
@@ -479,6 +607,7 @@ export class PuppeteerService {
                     const checkbox = document.querySelector('input[type="checkbox"]');
                     if (checkbox && checkbox instanceof HTMLInputElement) {
                         checkbox.checked = true;
+                        console.log('✅ Checkbox checked');
                         checkbox.click();
                     }
                 });
@@ -493,6 +622,7 @@ export class PuppeteerService {
                         return text.toLowerCase().includes('proceed');
                     });
                     if (proceedBtn && proceedBtn instanceof HTMLElement) {
+                        console.log('✅ Clicking Proceed button');
                         proceedBtn.click();
                     }
                 });
@@ -501,6 +631,7 @@ export class PuppeteerService {
 
                 // Click "View Tax Credit (Form 26AS/Annual Tax Statement)"
                 onProgress?.('Opening 26AS viewer...');
+                console.log('🔍 [Puppeteer] Looking for View Tax Credit link...');
                 await tracesPage.evaluate(() => {
                     const links = Array.from(document.querySelectorAll('a'));
                     const viewLink = links.find(link =>
@@ -508,6 +639,7 @@ export class PuppeteerService {
                         link.textContent?.includes('Form 26AS')
                     );
                     if (viewLink) {
+                        console.log('✅ Clicking View Tax Credit link');
                         viewLink.click();
                     }
                 });
@@ -575,21 +707,40 @@ export class PuppeteerService {
                 console.log('⚠️ [Puppeteer] Could not find format dropdown, using default');
             }
 
-            // Click "View/Download" button
+            // Click "View / Download" button
             onProgress?.('Clicking download button...');
             const downloadClicked = await tracesPage.evaluate(() => {
-                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a'));
-                const downloadBtn = buttons.find(btn => {
-                    const text = ((btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '').toLowerCase();
-                    return (text.includes('view') && text.includes('download')) ||
-                        text.includes('download') ||
-                        text.includes('view/download');
+                // First, try to find the exact button by text content
+                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
+
+                // Log all button texts for debugging
+                console.log('Available buttons:', buttons.map(btn => {
+                    const text = (btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '';
+                    return text.trim();
+                }));
+
+                // Try exact match first
+                let downloadBtn = buttons.find(btn => {
+                    const text = ((btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '').trim();
+                    return text === 'View / Download' || text === 'View/Download' || text === 'View / Download';
                 });
+
+                // If not found, try partial match
+                if (!downloadBtn) {
+                    downloadBtn = buttons.find(btn => {
+                        const text = ((btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '').toLowerCase();
+                        // Match "view" and "download" with any characters in between
+                        return text.includes('view') && text.includes('download');
+                    });
+                }
+
                 if (downloadBtn && downloadBtn instanceof HTMLElement) {
-                    console.log('✅ Found download button:', (downloadBtn as HTMLElement).textContent || (downloadBtn as HTMLInputElement).value);
+                    const btnText = (downloadBtn as HTMLElement).textContent || (downloadBtn as HTMLInputElement).value || '';
+                    console.log('✅ Found download button:', btnText.trim());
                     downloadBtn.click();
                     return true;
                 }
+                console.log('❌ Download button not found');
                 return false;
             });
 
@@ -630,60 +781,7 @@ export class PuppeteerService {
                 console.log('📄 [Puppeteer] Using most recent file:', downloadedFile);
             }
 
-            // Logout from TRACES portal if we're still on it
-            const finalUrl = page.url();
-            if (finalUrl.includes('tdscpc.gov.in')) {
-                try {
-                    onProgress?.('🚪 Logging out from TRACES...');
-                    console.log('🚪 [Puppeteer] Logging out from TRACES portal');
 
-                    await page.evaluate(() => {
-                        const logoutLinks = Array.from(document.querySelectorAll('a'));
-                        const logoutLink = logoutLinks.find(link =>
-                            link.textContent?.toLowerCase().includes('logout')
-                        );
-                        if (logoutLink) {
-                            logoutLink.click();
-                        }
-                    });
-
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    console.log('✅ [Puppeteer] Logged out from TRACES');
-                } catch (logoutError) {
-                    console.log('⚠️ [Puppeteer] TRACES logout failed (non-critical):', logoutError);
-                }
-            }
-
-            // Navigate back to Income Tax portal and logout
-            try {
-                onProgress?.('🚪 Logging out from Income Tax portal...');
-                console.log('🚪 [Puppeteer] Logging out from Income Tax portal');
-
-                await page.goto('https://eportal.incometax.gov.in/iec/foservices/#/dashboard', {
-                    waitUntil: 'networkidle0',
-                    timeout: 30000
-                });
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Click on profile/user icon and then logout
-                await page.evaluate(() => {
-                    // Look for logout button or link
-                    const allElements = Array.from(document.querySelectorAll('a, button, *'));
-                    const logoutElement = allElements.find(el => {
-                        const text = el.textContent?.toLowerCase() || '';
-                        return text.includes('log out') || text.includes('logout') || text === 'logout';
-                    });
-                    if (logoutElement && logoutElement instanceof HTMLElement) {
-                        logoutElement.click();
-                    }
-                });
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                console.log('✅ [Puppeteer] Logged out from Income Tax portal');
-            } catch (logoutError) {
-                console.log('⚠️ [Puppeteer] Income Tax portal logout failed (non-critical):', logoutError);
-            }
 
             await browser.close();
 

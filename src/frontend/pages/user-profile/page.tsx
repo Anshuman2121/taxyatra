@@ -1445,7 +1445,10 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                                                         return;
                                                     }
 
-                                                    const assessmentYear = '2024-25'; // TODO: Make this selectable
+                                                    // Convert Financial Year to Assessment Year
+                                                    // F.Y. 2021-22 -> A.Y. 2022-23
+                                                    const [startYear, endYear] = selectedFinancialYear.split('-');
+                                                    const assessmentYear = `20${endYear}-${(parseInt(endYear) + 1).toString().padStart(2, '0')}`;
 
                                                     setDownloadStatus('🔐 Logging in...');
                                                     const result = await window.electronAPI.download26AS(pan, credentials.password, assessmentYear);
