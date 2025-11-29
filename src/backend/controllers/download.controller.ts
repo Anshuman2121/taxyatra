@@ -4,52 +4,36 @@ import fs from 'fs';
 import puppeteerService from '../services/puppeteer.service';
 
 export function registerDownloadHandlers() {
-    ipcMain.handle('download:26as', async (_, pan: string, password: string, assessmentYear: string) => {
+    ipcMain.handle('download:26as', async (event, pan: string, password: string, assessmentYear: string) => {
         console.log('📥 [Download Controller] 26AS download requested for PAN:', pan, 'AY:', assessmentYear);
 
         try {
-            // Step 1: Login to get fresh cookies
-            console.log('🔐 [Download Controller] Logging in to get session cookies...');
-            const loginResult = await puppeteerService.login(pan, password, (status) => {
-                console.log('📊 [Download Controller] Login progress:', status);
-            });
+            // Create download directory: /Downloads/TaxYatra/{PAN}/{AssessmentYear}/26AS/
+            const downloadsDir = path.join(
+                app.getPath('downloads'),
+                'TaxYatra',
+                pan,
+                assessmentYear,
+                '26AS'
+            );
 
-            if (!loginResult.success || !loginResult.cookies) {
-                console.error('❌ [Download Controller] Login failed:', loginResult.message);
-                return {
-                    success: false,
-                    message: loginResult.message || 'Login failed'
-                };
-            }
-
-            console.log('✅ [Download Controller] Login successful, got cookies');
-
-            // Step 2: Create download directory if it doesn't exist
-            const downloadsDir = path.join(app.getPath('downloads'), 'TaxYatra', '26AS', pan);
             if (!fs.existsSync(downloadsDir)) {
                 fs.mkdirSync(downloadsDir, { recursive: true });
                 console.log('📁 [Download Controller] Created download directory:', downloadsDir);
             }
 
-            // Step 3: Download 26AS using the fresh cookies
-            console.log('📥 [Download Controller] Starting 26AS download...');
+            // Download 26AS (login happens within the same browser session)
+            console.log('📥 [Download Controller] Starting 26AS download with login...');
             const result = await puppeteerService.download26AS(
-                loginResult.cookies,
+                pan,
+                password,
                 assessmentYear,
                 downloadsDir,
-                (status) => {
+                event,
+                (status: string) => {
                     console.log('📊 [Download Controller] Download progress:', status);
                 }
             );
-
-            // Step 4: Logout to clean up session
-            try {
-                console.log('🚪 [Download Controller] Logging out...');
-                await puppeteerService.logout(loginResult.cookies);
-                console.log('✅ [Download Controller] Logged out successfully');
-            } catch (logoutError) {
-                console.log('⚠️ [Download Controller] Logout failed (non-critical):', logoutError);
-            }
 
             if (result.success) {
                 console.log('✅ [Download Controller] 26AS downloaded successfully:', result.filePath);
