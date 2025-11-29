@@ -453,27 +453,70 @@ export class PuppeteerService {
                 timeout: 60000
             });
 
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Wait for Angular app to fully load (wait for loading spinner to disappear)
+            onProgress?.('Waiting for dashboard to load...');
+            console.log('⏳ [Puppeteer] Waiting for Angular app to fully load...');
+            try {
+                await page.waitForFunction(
+                    () => {
+                        // Check if loading spinner is gone
+                        const loader = document.querySelector('.loader-container');
+                        const loaderText = document.querySelector('.loader-text');
+                        const isLoading = loaderText?.textContent?.includes('LOADING');
+                        
+                        // Check if dashboard content is visible
+                        const hasContent = document.body.innerText.includes('Dashboard') || 
+                                          document.body.innerText.includes('e-File') ||
+                                          document.body.innerText.includes('Welcome');
+                        
+                        return !isLoading && hasContent;
+                    },
+                    { timeout: 30000 }
+                );
+                console.log('✅ [Puppeteer] Angular app loaded');
+            } catch (e) {
+                console.log('⚠️ [Puppeteer] Timeout waiting for app load, continuing anyway...');
+            }
 
-            // Set up listener for new TRACES tab BEFORE clicking
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Set up listener for new TRACES tab BEFORE clicking any menu items
+            // IMPORTANT: We just track that a new tab was created, but don't interfere with its loading
             onProgress?.('Setting up for TRACES navigation...');
-            const newTabPromise = new Promise<any>((resolve) => {
-                browser.once('targetcreated', async (target) => {
-                    const newPage = await target.page();
-                    resolve(newPage);
-                });
-            });
-
-            // Click on e-File menu
-            onProgress?.('Opening e-File menu...');
-            await page.evaluate(() => {
-                const menuItems = Array.from(document.querySelectorAll('*'));
-                const eFileMenu = menuItems.find(el => el.textContent?.trim() === 'e-File');
-                if (eFileMenu && eFileMenu instanceof HTMLElement) {
-                    console.log('✅ Clicking e-File menu');
-                    eFileMenu.click();
+            let newTabDetected = false;
+            
+            browser.on('targetcreated', async (target) => {
+                const targetType = target.type();
+                console.log('🆕 [Puppeteer] New target created:', targetType, target.url());
+                if (targetType === 'page') {
+                    newTabDetected = true;
                 }
             });
+
+            // Click on e-File menu - look in the navigation/header area
+            onProgress?.('Opening e-File menu...');
+            console.log('🔍 [Puppeteer] Looking for e-File menu...');
+            
+            const eFileClicked = await page.evaluate(() => {
+                // Look for e-File in navigation elements
+                const navElements = Array.from(document.querySelectorAll('nav a, nav span, nav button, header a, header span, .mat-menu-trigger, [mat-button], a, button, span'));
+                const eFileMenu = navElements.find(el => {
+                    const text = el.textContent?.trim() || '';
+                    return text === 'e-File' || text === 'e-file' || text === 'E-File';
+                });
+                
+                if (eFileMenu && eFileMenu instanceof HTMLElement) {
+                    console.log('✅ Found e-File menu:', eFileMenu.tagName);
+                    eFileMenu.click();
+                    return true;
+                }
+                console.log('❌ e-File menu not found');
+                return false;
+            });
+            
+            if (!eFileClicked) {
+                console.log('⚠️ [Puppeteer] e-File menu not found, trying alternative selectors...');
+            }
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -512,149 +555,333 @@ export class PuppeteerService {
                 console.log('⚠️ [Puppeteer] Error checking for dialog:', error);
             }
 
-            // If dialog was dismissed, re-click e-File menu as it may have closed
+            // If dialog was dismissed, wait a bit for it to close
             if (dialogWasDismissed) {
-                console.log('🔄 [Puppeteer] Re-opening e-File menu after dialog dismissal...');
-                await page.evaluate(() => {
-                    const menuItems = Array.from(document.querySelectorAll('*'));
-                    const eFileMenu = menuItems.find(el => el.textContent?.trim() === 'e-File');
-                    if (eFileMenu && eFileMenu instanceof HTMLElement) {
-                        console.log('✅ Re-clicking e-File menu');
-                        eFileMenu.click();
-                    }
-                });
+                console.log('🔄 [Puppeteer] Waiting for dialog to fully close...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
-            } else {
-                await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
-            // Step 1: Hover over Income Tax Returns to open submenu
-            onProgress?.('Navigating to Income Tax Returns...');
-            console.log('🔍 [Puppeteer] Looking for Income Tax Returns menu item...');
-
-            const itrHovered = await page.evaluate(() => {
-                const menuItems = Array.from(document.querySelectorAll('*'));
-                const itrMenu = menuItems.find(el => {
+            // ============================================
+            // NESTED MENU NAVIGATION: e-File -> Income Tax Returns -> View Form 26AS
+            // Using Puppeteer's native mouse actions for reliable hover
+            // ============================================
+            onProgress?.('Navigating to View Form 26AS...');
+            
+            // Step 1: Find and click "e-File" menu using XPath/selector
+            console.log('🔍 [Puppeteer] Step 1: Clicking e-File menu...');
+            
+            // Find e-File button position and click using mouse
+            const eFileBox = await page.evaluate(() => {
+                const allElements = Array.from(document.querySelectorAll('a, button, span, li, div'));
+                const eFileBtn = allElements.find(el => {
+                    const text = el.textContent?.trim() || '';
+                    return text === 'e-File';
+                });
+                
+                if (eFileBtn) {
+                    const rect = eFileBtn.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
+                }
+                return null;
+            });
+            
+            if (eFileBox && eFileBox.found) {
+                console.log('✅ [Puppeteer] Found e-File at:', eFileBox.x, eFileBox.y);
+                await page.mouse.click(eFileBox.x, eFileBox.y);
+            } else {
+                // Fallback: click via evaluate
+                await page.evaluate(() => {
+                    const allElements = Array.from(document.querySelectorAll('a, button, span, li, div'));
+                    const eFileBtn = allElements.find(el => el.textContent?.trim() === 'e-File');
+                    if (eFileBtn && eFileBtn instanceof HTMLElement) {
+                        eFileBtn.click();
+                        console.log('✅ Clicked e-File via evaluate');
+                    }
+                });
+            }
+            
+            // Wait for dropdown to appear
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Debug: Take screenshot and log overlay content
+            console.log('📸 [Puppeteer] Checking dropdown state...');
+            const overlayContent = await page.evaluate(() => {
+                const overlay = document.querySelector('.cdk-overlay-container');
+                if (overlay) {
+                    return {
+                        hasContent: overlay.innerHTML.length > 100,
+                        text: overlay.textContent?.substring(0, 300) || '',
+                        childCount: overlay.children.length
+                    };
+                }
+                return { hasContent: false, text: '', childCount: 0 };
+            });
+            console.log('📋 [Puppeteer] Overlay state:', JSON.stringify(overlayContent));
+            
+            // Step 2: Hover over "Income Tax Returns" using Puppeteer's mouse
+            console.log('🔍 [Puppeteer] Step 2: Hovering over Income Tax Returns...');
+            
+            // Find the Income Tax Returns element and get its bounding box
+            const itrBoundingBox = await page.evaluate(() => {
+                const overlay = document.querySelector('.cdk-overlay-container');
+                if (!overlay) return null;
+                
+                const menuItems = Array.from(overlay.querySelectorAll('button, a, span, div'));
+                const itrItem = menuItems.find(el => {
                     const text = el.textContent?.trim() || '';
                     return text === 'Income Tax Returns';
                 });
-
-                if (!itrMenu || !(itrMenu instanceof HTMLElement)) {
-                    return false;
+                
+                if (itrItem) {
+                    const rect = itrItem.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
                 }
-
-                console.log('✅ Found Income Tax Returns menu item');
-
-                // Trigger mouseenter event to show submenu
-                const mouseEnterEvent = new MouseEvent('mouseenter', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                });
-                itrMenu.dispatchEvent(mouseEnterEvent);
-                itrMenu.click();
-                return true;
+                return null;
             });
-
-            if (!itrHovered) {
-                throw new Error('Income Tax Returns menu not found');
+            
+            if (itrBoundingBox && itrBoundingBox.found) {
+                console.log('✅ [Puppeteer] Found Income Tax Returns at:', itrBoundingBox.x, itrBoundingBox.y);
+                
+                // Use Puppeteer's mouse to hover - this is more reliable than JS events
+                await page.mouse.move(itrBoundingBox.x, itrBoundingBox.y);
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Move mouse slightly to trigger hover state
+                await page.mouse.move(itrBoundingBox.x + 5, itrBoundingBox.y);
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            } else {
+                console.log('❌ [Puppeteer] Income Tax Returns not found, trying to re-open e-File menu...');
+                
+                // Try clicking e-File again
+                await page.evaluate(() => {
+                    const allElements = Array.from(document.querySelectorAll('a, button, span, li, div'));
+                    const eFileBtn = allElements.find(el => el.textContent?.trim() === 'e-File');
+                    if (eFileBtn && eFileBtn instanceof HTMLElement) eFileBtn.click();
+                });
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Try again to find ITR
+                const itrRetry = await page.evaluate(() => {
+                    const overlay = document.querySelector('.cdk-overlay-container');
+                    if (!overlay) return null;
+                    
+                    const menuItems = Array.from(overlay.querySelectorAll('button, a, span, div'));
+                    const itrItem = menuItems.find(el => el.textContent?.trim() === 'Income Tax Returns');
+                    
+                    if (itrItem) {
+                        const rect = itrItem.getBoundingClientRect();
+                        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+                    }
+                    return null;
+                });
+                
+                if (itrRetry) {
+                    await page.mouse.move(itrRetry.x, itrRetry.y);
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                } else {
+                    throw new Error('Income Tax Returns menu item not found');
+                }
             }
-
-            console.log('✅ [Puppeteer] Hovered over Income Tax Returns');
-
-            // Step 2: Wait for View Form 26AS link to appear (asynchronous wait)
-            onProgress?.('Waiting for submenu to load...');
-            console.log('🔍 [Puppeteer] Waiting for View Form 26AS link to appear...');
-
-            try {
-                await page.waitForFunction(
-                    () => {
-                        const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
-                        return allElements.some(el => {
-                            const text = el.textContent?.trim() || '';
-                            return text === 'View Form 26AS' || text.includes('View Form 26AS');
-                        });
-                    },
-                    { timeout: 5000 }
-                );
-                console.log('✅ [Puppeteer] View Form 26AS link appeared');
-            } catch (error) {
-                console.log('❌ [Puppeteer] Timeout waiting for View Form 26AS link');
-                throw new Error('View Form 26AS link did not appear after hovering');
-            }
-
-            // Step 3: Click View Form 26AS immediately
-            onProgress?.('Clicking View Form 26AS...');
-            const view26ASClicked = await page.evaluate(() => {
-                const allElements = Array.from(document.querySelectorAll('a, button, div, span'));
-
-                // Try exact match first
-                let view26AS = allElements.find(el => {
+            
+            // Step 3: Wait for submenu and click "View Form 26AS"
+            console.log('🔍 [Puppeteer] Step 3: Looking for View Form 26AS...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Find View Form 26AS and get its position
+            const view26ASBox = await page.evaluate(() => {
+                const overlay = document.querySelector('.cdk-overlay-container');
+                if (!overlay) return null;
+                
+                const allItems = Array.from(overlay.querySelectorAll('button, a, span, div'));
+                const view26AS = allItems.find(el => {
                     const text = el.textContent?.trim() || '';
                     return text === 'View Form 26AS';
                 });
-
-                // If not found, try partial match
-                if (!view26AS) {
-                    view26AS = allElements.find(el => {
-                        const text = el.textContent?.trim() || '';
-                        return text.includes('View Form 26AS');
-                    });
+                
+                if (view26AS) {
+                    const rect = view26AS.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
                 }
-
-                if (view26AS && view26AS instanceof HTMLElement) {
-                    console.log('✅ Clicking View Form 26AS:', view26AS.textContent?.trim());
-                    view26AS.click();
-                    return true;
-                }
-                return false;
+                
+                // Log available items for debugging
+                const availableItems = allItems
+                    .map(el => el.textContent?.trim())
+                    .filter(t => t && t.length > 0 && t.length < 50);
+                console.log('📋 Available menu items:', availableItems.slice(0, 20));
+                return null;
             });
-
-            if (!view26ASClicked) {
-                throw new Error('Failed to click View Form 26AS link');
+            
+            if (!view26ASBox) {
+                // Try one more time - hover again and wait
+                console.log('⚠️ [Puppeteer] View Form 26AS not found, retrying hover...');
+                
+                const itrRetry2 = await page.evaluate(() => {
+                    const overlay = document.querySelector('.cdk-overlay-container');
+                    if (!overlay) return null;
+                    const menuItems = Array.from(overlay.querySelectorAll('button, a, span, div'));
+                    const itrItem = menuItems.find(el => el.textContent?.trim() === 'Income Tax Returns');
+                    if (itrItem) {
+                        const rect = itrItem.getBoundingClientRect();
+                        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+                    }
+                    return null;
+                });
+                
+                if (itrRetry2) {
+                    await page.mouse.move(itrRetry2.x, itrRetry2.y);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+            
+            // Click View Form 26AS using mouse click
+            // First, get the updated position
+            const finalView26ASBox = await page.evaluate(() => {
+                const overlay = document.querySelector('.cdk-overlay-container');
+                if (!overlay) return null;
+                
+                const allItems = Array.from(overlay.querySelectorAll('button, a, span, div'));
+                const view26AS = allItems.find(el => {
+                    const text = el.textContent?.trim() || '';
+                    return text === 'View Form 26AS';
+                });
+                
+                if (view26AS) {
+                    const rect = view26AS.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        found: true
+                    };
+                }
+                
+                // Log available items
+                const availableItems = allItems
+                    .map(el => el.textContent?.trim())
+                    .filter(t => t && t.length > 0 && t.length < 50);
+                console.log('📋 Available items in overlay:', availableItems.slice(0, 20));
+                return null;
+            });
+            
+            if (finalView26ASBox && finalView26ASBox.found) {
+                console.log('✅ [Puppeteer] Found View Form 26AS, clicking at:', finalView26ASBox.x, finalView26ASBox.y);
+                
+                // Use Puppeteer's mouse to click
+                await page.mouse.click(finalView26ASBox.x, finalView26ASBox.y);
+            } else {
+                // Fallback: try clicking via evaluate
+                const clicked = await page.evaluate(() => {
+                    const overlay = document.querySelector('.cdk-overlay-container');
+                    if (!overlay) return false;
+                    
+                    const allItems = Array.from(overlay.querySelectorAll('button, a, span, div'));
+                    const view26AS = allItems.find(el => {
+                        const text = el.textContent?.trim() || '';
+                        return text === 'View Form 26AS' || text.includes('View Form 26AS');
+                    });
+                    
+                    if (view26AS && view26AS instanceof HTMLElement) {
+                        view26AS.click();
+                        return true;
+                    }
+                    return false;
+                });
+                
+                if (!clicked) {
+                    throw new Error('View Form 26AS link not found in submenu');
+                }
             }
 
             console.log('✅ [Puppeteer] Successfully clicked View Form 26AS');
 
-            // Wait for new TRACES tab to open
-            onProgress?.('Waiting for TRACES tab...');
-            let tracesPage;
-            try {
-                tracesPage = await Promise.race([
-                    newTabPromise,
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('TRACES tab timeout')), 15000))
-                ]);
-                console.log('✅ [Puppeteer] TRACES tab opened');
-            } catch (error) {
-                // If new tab didn't open, check if we're already on TRACES page
-                const currentUrl = page.url();
-                if (currentUrl.includes('tdscpc.gov.in')) {
-                    console.log('✅ [Puppeteer] Already on TRACES page (same tab)');
-                    tracesPage = page;
-                } else {
-                    throw new Error('TRACES tab did not open');
+            // ============================================
+            // ALTERNATIVE APPROACH: Use API to get TRACES token directly
+            // This is more reliable than waiting for the new tab
+            // ============================================
+            onProgress?.('Getting TRACES authentication token...');
+            
+            // Extract the assessment year number (e.g., "2025-26" -> "2025")
+            const ayNumber = assessmentYear.split('-')[0];
+            console.log(`📋 [Puppeteer] Assessment year for API: ${ayNumber}`);
+            
+            // Make the API call to get the signed token for TRACES
+            const tracesTokenResponse = await page.evaluate(async (panValue: string, ay: string) => {
+                try {
+                    const response = await fetch('https://eportal.incometax.gov.in/iec/utilityservicesapi/auth/v0.1/redirectionView26AS', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json, text/plain, */*',
+                            'Content-Type': 'application/json',
+                            'sn': 'NA'
+                        },
+                        body: JSON.stringify({ pan: panValue, ay: ay }),
+                        credentials: 'include' // Include cookies for authentication
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: `API returned ${response.status}` };
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, data: data.data, signature: data.signature };
+                } catch (e: any) {
+                    return { error: e.message };
                 }
+            }, pan, ayNumber);
+            
+            console.log('📋 [Puppeteer] TRACES token response:', tracesTokenResponse.success ? 'Success' : tracesTokenResponse.error);
+            
+            if (!tracesTokenResponse.success || !tracesTokenResponse.data || !tracesTokenResponse.signature) {
+                throw new Error(`Failed to get TRACES token: ${tracesTokenResponse.error || 'No data received'}`);
             }
-
-            // Switch to TRACES tab
-            await tracesPage.bringToFront();
-
+            
+            // Now open a new page and submit the form to TRACES
+            onProgress?.('Opening TRACES portal...');
+            console.log('🔄 [Puppeteer] Creating new page for TRACES...');
+            
+            const tracesPage = await browser.newPage();
+            
             // Set download behavior for TRACES tab
             const tracesClient = await tracesPage.createCDPSession();
             await tracesClient.send('Page.setDownloadBehavior', {
                 behavior: 'allow',
                 downloadPath: downloadPath
             });
-
-            // Wait for TRACES page to load
-            await new Promise(resolve => setTimeout(resolve, 5000));
-
-            // Check if we're on TRACES page and accept terms
-            const tracesUrl = tracesPage.url();
-            console.log('📍 [Puppeteer] TRACES page URL:', tracesUrl);
-
-            if (tracesUrl.includes('tdscpc.gov.in') || tracesUrl.includes('traces')) {
-                console.log('✅ [Puppeteer] On TRACES page');
+            
+            // Navigate to TRACES and submit the form with the token
+            // The TRACES URL expects a POST with 'data' and 'signature' parameters
+            await tracesPage.setContent(`
+                <html>
+                <body>
+                    <form id="tracesForm" method="POST" action="https://services.tdscpc.gov.in/serv/view26AS.xhtml">
+                        <input type="hidden" name="data" value="${tracesTokenResponse.data}" />
+                        <input type="hidden" name="signature" value="${tracesTokenResponse.signature}" />
+                    </form>
+                    <script>document.getElementById('tracesForm').submit();</script>
+                </body>
+                </html>
+            `);
+            // The TRACES page should now be loaded with authentication
+            // Check if there's a terms checkbox to accept
+            onProgress?.('Checking TRACES page...');
+            
+            const hasTermsCheckbox = await tracesPage.evaluate(() => {
+                return !!document.querySelector('input[type="checkbox"]');
+            });
+            
+            if (hasTermsCheckbox) {
+                console.log('📋 [Puppeteer] Found terms checkbox, accepting...');
                 onProgress?.('Accepting TRACES terms...');
 
                 // Check the agreement checkbox
@@ -700,23 +927,69 @@ export class PuppeteerService {
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 5000));
+            } else {
+                console.log('📋 [Puppeteer] No terms checkbox found, page may already be on 26AS viewer');
             }
 
             // Now we should be on the 26AS page - look for download options
             onProgress?.('Looking for download options...');
+            
+            // Wait for page to fully load
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Debug: Log page content to understand structure
+            const pageDebugInfo = await tracesPage.evaluate(() => {
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    hasIframes: document.querySelectorAll('iframe').length,
+                    selectCount: document.querySelectorAll('select').length,
+                    buttonCount: document.querySelectorAll('button, input[type="button"], input[type="submit"]').length,
+                    bodyText: document.body.innerText.substring(0, 500)
+                };
+            });
+            console.log('📋 [Puppeteer] TRACES page debug info:', JSON.stringify(pageDebugInfo, null, 2));
+
+            // Check if there's an iframe we need to switch to
+            const frames = tracesPage.frames();
+            console.log(`📋 [Puppeteer] Found ${frames.length} frames`);
+            
+            let targetFrame = tracesPage.mainFrame();
+            for (const frame of frames) {
+                const frameUrl = frame.url();
+                console.log(`  - Frame URL: ${frameUrl}`);
+                if (frameUrl.includes('26AS') || frameUrl.includes('taxcredit') || frameUrl.includes('ViewTaxCredit')) {
+                    targetFrame = frame;
+                    console.log('✅ [Puppeteer] Found target frame for 26AS');
+                    break;
+                }
+            }
 
             // Select assessment year from dropdown
             onProgress?.(`Selecting assessment year ${assessmentYear}...`);
-            const yearSelected = await tracesPage.evaluate((ay: string) => {
+            
+            // Log all select elements for debugging
+            await targetFrame.evaluate(() => {
+                const selects = Array.from(document.querySelectorAll('select'));
+                console.log('📋 Found selects:', selects.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    options: Array.from(s.options).map(o => o.text)
+                })));
+            });
+            
+            const yearSelected = await targetFrame.evaluate((ay: string) => {
                 const selects = Array.from(document.querySelectorAll('select'));
                 for (const select of selects) {
-                    // Look for the assessment year select
                     const options = Array.from(select.options);
+                    // Look for assessment year - try various patterns
                     const matchingOption = options.find(opt => {
-                        // Match patterns like "2024-25" or "2024-2025"
-                        const yearPattern = ay.replace('-', '');
-                        return opt.text.includes(ay) || opt.value.includes(ay) ||
-                            opt.text.includes(yearPattern) || opt.value.includes(yearPattern);
+                        const text = opt.text || '';
+                        const value = opt.value || '';
+                        // Match patterns like "2025-26", "2024-25", etc.
+                        return text.includes(ay) || value.includes(ay) ||
+                               text.includes(ay.replace('-', '')) || 
+                               value.includes(ay.replace('-', ''));
                     });
                     if (matchingOption) {
                         select.value = matchingOption.value;
@@ -737,11 +1010,10 @@ export class PuppeteerService {
 
             // Select "Text" format from "View As" dropdown
             onProgress?.('Selecting Text format...');
-            const formatSelected = await tracesPage.evaluate(() => {
+            const formatSelected = await targetFrame.evaluate(() => {
                 const selects = Array.from(document.querySelectorAll('select'));
                 for (const select of selects) {
                     const options = Array.from(select.options);
-                    // Look for "Text" option in View As dropdown
                     const textOption = options.find(opt =>
                         opt.text.toLowerCase().includes('text') || opt.value.toLowerCase().includes('text')
                     );
@@ -764,29 +1036,36 @@ export class PuppeteerService {
 
             // Click "View / Download" button
             onProgress?.('Clicking download button...');
-            const downloadClicked = await tracesPage.evaluate(() => {
-                // First, try to find the exact button by text content
-                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
-
-                // Log all button texts for debugging
-                console.log('Available buttons:', buttons.map(btn => {
+            
+            // Log all buttons for debugging
+            await targetFrame.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a.btn, .btn'));
+                console.log('📋 Available buttons:', buttons.map(btn => {
                     const text = (btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '';
-                    return text.trim();
+                    return { tag: btn.tagName, text: text.trim(), id: btn.id, class: btn.className };
                 }));
+            });
+            
+            const downloadClicked = await targetFrame.evaluate(() => {
+                // Try multiple selectors for the download button
+                const allClickables = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, .btn'));
 
                 // Try exact match first
-                let downloadBtn = buttons.find(btn => {
-                    const text = ((btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '').trim();
-                    return text === 'View / Download' || text === 'View/Download' || text === 'View / Download';
+                let downloadBtn = allClickables.find(btn => {
+                    const text = ((btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '').trim().toLowerCase();
+                    return text === 'view / download' || text === 'view/download' || 
+                           text === 'view' || text === 'download' ||
+                           text.includes('view') && text.includes('download');
                 });
 
-                // If not found, try partial match
+                // Try by ID or class
                 if (!downloadBtn) {
-                    downloadBtn = buttons.find(btn => {
-                        const text = ((btn as HTMLElement).textContent || (btn as HTMLInputElement).value || '').toLowerCase();
-                        // Match "view" and "download" with any characters in between
-                        return text.includes('view') && text.includes('download');
-                    });
+                    downloadBtn = document.querySelector('#btnView, #btnDownload, .btnView, .btnDownload, [name="btnView"]') as HTMLElement;
+                }
+                
+                // Try submit button
+                if (!downloadBtn) {
+                    downloadBtn = document.querySelector('input[type="submit"]') as HTMLElement;
                 }
 
                 if (downloadBtn && downloadBtn instanceof HTMLElement) {
@@ -801,13 +1080,29 @@ export class PuppeteerService {
 
             if (!downloadClicked) {
                 console.log('⚠️ [Puppeteer] Could not find download button, trying alternative methods...');
+                
+                // Try clicking any submit button
+                await targetFrame.evaluate(() => {
+                    const submitBtn = document.querySelector('input[type="submit"], button[type="submit"]') as HTMLElement;
+                    if (submitBtn) {
+                        submitBtn.click();
+                        console.log('✅ Clicked submit button as fallback');
+                    }
+                });
             } else {
                 console.log('✅ [Puppeteer] Download button clicked');
             }
 
-            // Wait longer for download to complete (text files may take time)
+            // Wait longer for download to complete
             onProgress?.('Downloading file...');
-            await new Promise(resolve => setTimeout(resolve, 15000)); // Increased wait time
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            // Check if a new window/popup opened with the download
+            const allPages = await browser.pages();
+            console.log(`📋 [Puppeteer] Total pages after download click: ${allPages.length}`);
+            
+            // Wait additional time for download
+            await new Promise(resolve => setTimeout(resolve, 10000));
 
             // Get the downloaded file name
             const fs = require('fs');
