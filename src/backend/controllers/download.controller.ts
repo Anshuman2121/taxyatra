@@ -1,7 +1,7 @@
 import { ipcMain, app } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import puppeteerService from '../services/puppeteer.service';
+import playwrightService from '../services/playwright.service';
 
 export function registerDownloadHandlers() {
     ipcMain.handle('download:26as', async (event, pan: string, password: string, assessmentYear: string) => {
@@ -24,7 +24,7 @@ export function registerDownloadHandlers() {
 
             // Download 26AS (login happens within the same browser session)
             console.log('📥 [Download Controller] Starting 26AS download with login...');
-            const result = await puppeteerService.download26AS(
+            const result = await playwrightService.download26AS(
                 pan,
                 password,
                 assessmentYear,
@@ -71,7 +71,7 @@ export function registerDownloadHandlers() {
 
             // Download AIS (login happens within the same browser session)
             console.log('📥 [Download Controller] Starting AIS download with login...');
-            const result = await puppeteerService.downloadAIS(
+            const result = await playwrightService.downloadAIS(
                 pan,
                 password,
                 financialYear,
@@ -129,7 +129,7 @@ export function registerDownloadHandlers() {
 
             // Download TIS (login happens within the same browser session)
             console.log('📥 [Download Controller] Starting TIS download with login...');
-            const result = await puppeteerService.downloadTIS(
+            const result = await playwrightService.downloadTIS(
                 pan,
                 password,
                 financialYear,

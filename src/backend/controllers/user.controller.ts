@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import puppeteerService from '../services/puppeteer.service';
+import playwrightService from '../services/playwright.service';
 import userDataService from '../services/userDataService';
 import { ITRRepository } from '../database/repositories/itr.repository';
 import { getDatabase, isDatabaseOpen } from '../database/connection';
@@ -25,7 +25,7 @@ export function registerUserHandlers() {
                         sendProgress('🔐 Logging in...');
                     }
 
-                    const result = await puppeteerService.login(pan, password, sendProgress);
+                    const result = await playwrightService.login(pan, password, sendProgress);
 
                     if (result.success) {
                         // Check if AuthToken was captured
@@ -87,7 +87,7 @@ export function registerUserHandlers() {
                             // Logout to clean up session
                             try {
                                 sendProgress('🚪 Logging out...');
-                                await puppeteerService.logout(result.cookies);
+                                await playwrightService.logout(result.cookies);
                                 console.log('✅ [User Controller] Logged out successfully');
                             } catch (logoutError) {
                                 console.log('⚠️ [User Controller] Logout failed (non-critical):', logoutError);

@@ -20,9 +20,16 @@ export default defineConfig({
         'better-sqlite3',
         'bindings',
         'file-uri-to-path',
+        // Keep Puppeteer for backward compatibility (can be removed after testing)
         'puppeteer',
         'puppeteer-extra',
         'puppeteer-extra-plugin-stealth',
+        // Playwright and its dependencies
+        'playwright',
+        'playwright-core',
+        'playwright-extra',
+        'chromium-bidi',
+        '@playwright/test',
         'node-machine-id',
         ...builtinModules,
         ...builtinModules.map((m: string) => `node:${m}`)
