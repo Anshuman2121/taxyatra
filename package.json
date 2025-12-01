@@ -15,10 +15,8 @@
     "build:renderer": "vite build --config vite.renderer.config.ts",
     "build:preload": "vite build --config vite.preload.config.ts",
     "dist": "npm run build && electron-builder build",
-    "dist:win": "npm run build && electron-builder build --win --x64 --ia32",
-    "dist:mac": "npm run build && electron-builder build --mac --x64 --arm64",
-    "dist:linux": "npm run build && electron-builder build --linux",
-    "dist:all": "npm run build && electron-builder build -mwl",
+    "dist:win": "npm run build && electron-builder build --win --x64",
+    "dist:mac": "npm run build && electron-builder build --mac --arm64",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
@@ -43,6 +41,11 @@
       {
         "from": "src/resources",
         "to": "resources"
+      },
+      {
+        "from": "build",
+        "to": "build",
+        "filter": ["icon.ico", "icon.png", "icon.icns"]
       }
     ],
     "publish": [
@@ -111,7 +114,8 @@
       "installerHeaderIcon": "build/icon.ico",
       "deleteAppDataOnUninstall": true,
       "runAfterFinish": true,
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "afterPack": "./afterPack.js"
   },

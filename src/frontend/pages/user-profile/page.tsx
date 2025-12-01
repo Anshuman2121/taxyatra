@@ -571,7 +571,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
                     {/* Left Column - Main Form */}
-                    <div className="lg:col-span-4 space-y-6">
+                    <div className="lg:col-span-4 space-y-6 order-2 lg:order-1">
                         {/* Personal Details Section */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <button
@@ -1269,7 +1269,7 @@ export function UserProfilePage({ pan, onBack }: UserProfilePageProps) {
                     </div>
 
                     {/* Right Column - Sidebar Actions */}
-                    <div className="lg:col-span-1 space-y-6">
+                    <div className="lg:col-span-1 space-y-6 order-1 lg:order-2">
                         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm sticky top-24">
                             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Actions</h3>
 
