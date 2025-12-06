@@ -1,8 +1,41 @@
 import { ipcMain } from 'electron';
 import { isAppActivated, validateAndStoreActivationCode } from '../database/repositories/auth.repository';
 import { getDatabase, isDatabaseOpen } from '../database/connection';
+import puppeteerService from '../services/puppeteer.service';
 
 export function registerAuthHandlers() {
+    // Verify credentials using Puppeteer
+    ipcMain.handle('auth:verify-credentials', async (event, pan: string, password: string) => {
+        console.log('🔐 [Auth Controller] Verifying credentials for PAN:', pan);
+        try {
+            const result = await puppeteerService.login(
+                pan,
+                password,
+                event,
+                (status) => console.log(`[Auth Verify] ${status}`)
+            );
+
+            if (result.success) {
+                console.log('✅ [Auth Controller] Credentials verified successfully');
+                // Logout to clean up session
+                try {
+                    if (result.cookies) {
+                        await puppeteerService.logout(result.cookies);
+                    }
+                } catch (e) {
+                    console.log('⚠️ [Auth Controller] Logout after verification failed (non-critical):', e);
+                }
+                return { success: true };
+            } else {
+                console.log('❌ [Auth Controller] Credential verification failed:', result.message);
+                return { success: false, message: result.message || 'Invalid credentials' };
+            }
+        } catch (error: any) {
+            console.error('❌ [Auth Controller] Error verifying credentials:', error);
+            return { success: false, message: error.message };
+        }
+    });
+
     ipcMain.handle('check-activation', async () => {
         console.log('🔍 [Auth Controller] Checking app activation status...');
         try {
@@ -35,7 +68,7 @@ export function registerAuthHandlers() {
                 console.log('⚠️  [Auth Controller] Database is closed or closing');
                 return false;
             }
-            
+
             const db = getDatabase();
             if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
@@ -65,7 +98,7 @@ export function registerAuthHandlers() {
                 console.log('⚠️  [Auth Controller] Database is closed or closing');
                 return [];
             }
-            
+
             const db = getDatabase();
             if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');
@@ -89,7 +122,7 @@ export function registerAuthHandlers() {
                 console.log('⚠️  [Auth Controller] Database is closed or closing');
                 return null;
             }
-            
+
             const db = getDatabase();
             if (!db) {
                 console.error('❌ [Auth Controller] Database not initialized');

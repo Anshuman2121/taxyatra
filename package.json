@@ -145,6 +145,7 @@
     "wait-on": "^9.0.3"
   },
   "dependencies": {
+    "@puppeteer/browsers": "^2.11.0",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.16",
@@ -159,9 +160,10 @@
     "dotenv": "^17.2.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^11.0.2",
+    "find-chrome-bin": "^2.0.4",
     "lucide-react": "^0.554.0",
     "node-machine-id": "^1.1.12",
-    "puppeteer": "^24.29.1",
+    "puppeteer-core": "^24.32.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "^19.2.0",

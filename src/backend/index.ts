@@ -91,15 +91,48 @@ app.on('ready', async () => {
         console.log('✅ [Main] IPC handlers registered');
         createWindow();
         console.log('✅ [Main] Window created');
+
+        // Initialize Puppeteer Service with a delay to not block startup
+        setTimeout(() => {
+            import('./services/puppeteer.service').then(async (service) => {
+                console.log('🚀 [Main] Initializing Puppeteer Service (Delayed)...');
+                try {
+                    await service.default.init();
+                    console.log('✅ [Main] Puppeteer Service initialized');
+                } catch (err) {
+                    console.error('❌ [Main] Puppeteer Service init failed:', err);
+                }
+            });
+        }, 5000);
+
     } catch (error) {
         console.error('❌ [Main] Failed to initialize app:', error);
         app.quit();
     }
 });
 
-app.on('before-quit', (event) => {
-    console.log('🛑 [Main] App is quitting, closing database...');
-    closeDatabase();
+app.on('before-quit', async (event) => {
+    console.log('🛑 [Main] App is quitting, closing services...');
+
+    // Close Database
+    await closeDatabase(); // Assuming closeDatabase might be async or sync, safe to await
+
+    // Close Puppeteer Browser
+    // Close Puppeteer Browser
+    try {
+        console.log('🔒 [Main] Closing Puppeteer Service...');
+        // We import dynamically to avoid loading it if it wasn't used/loaded yet
+        const service = await import('./services/puppeteer.service');
+        if (service && service.default) {
+            // Force a specific timeout for close to prevent hanging
+            const closePromise = service.default.close();
+            const timeoutPromise = new Promise(resolve => setTimeout(resolve, 5000));
+            await Promise.race([closePromise, timeoutPromise]);
+            console.log('✅ [Main] Puppeteer Service closed');
+        }
+    } catch (e) {
+        console.error('⚠️ [Main] Error closing Puppeteer Service:', e);
+    }
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

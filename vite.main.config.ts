@@ -22,8 +22,11 @@ export default defineConfig({
         'file-uri-to-path',
         'puppeteer',
         'puppeteer-extra',
+        'puppeteer-extra',
         'puppeteer-extra-plugin-stealth',
         'node-machine-id',
+        'bufferutil',
+        'utf-8-validate',
         ...builtinModules,
         ...builtinModules.map((m: string) => `node:${m}`)
       ]
