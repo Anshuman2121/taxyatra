@@ -1,0 +1,73 @@
+{
+    "name": "taxyatra-sidecar",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "bin": "dist/index.js",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/ws": "^8.18.1",
+        "@vercel/ncc": "^0.38.4",
+        "esbuild": "^0.24.0",
+        "pkg": "^5.8.1",
+        "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "@puppeteer/browsers": "^2.11.0",
+        "arr-union": "^3.1.0",
+        "axios": "^0.21.4",
+        "axios-cookiejar-support": "^1.0.1",
+        "clone-deep": "^4.0.1",
+        "dotenv": "^16.3.1",
+        "electron-store": "^11.0.2",
+        "extend-shallow": "^3.0.2",
+        "for-in": "^1.0.2",
+        "for-own": "^1.0.0",
+        "is-buffer": "^2.0.5",
+        "is-extendable": "^1.0.1",
+        "is-plain-object": "^5.0.0",
+        "isarray": "^2.0.5",
+        "isobject": "^4.0.0",
+        "kind-of": "^6.0.3",
+        "lazy-cache": "^2.0.2",
+        "merge-deep": "^3.0.3",
+        "node-machine-id": "^1.1.12",
+        "puppeteer-core": "^24.32.0",
+        "puppeteer-extra": "^3.3.6",
+        "puppeteer-extra-plugin": "^3.2.2",
+        "puppeteer-extra-plugin-stealth": "^2.11.2",
+        "tough-cookie": "^6.0.0",
+        "ws": "^8.16.0"
+    },
+    "scripts": {
+        "build": "tsc",
+        "build:pkg": "npm run build && npm run package:mac-x64 && npm run package:mac-arm64",
+        "build:pkg:all": "npm run build && npm run package:mac-x64 && npm run package:mac-arm64 && npm run package:win-x64",
+        "build:pkg:win": "npm run build && npm run package:win-x64",
+        "package:mac-x64": "pkg . --targets node18-macos-x64 --output ../backend/bin/taxyatra-sidecar-x86_64-apple-darwin",
+        "package:mac-arm64": "pkg . --targets node18-macos-arm64 --output ../backend/bin/taxyatra-sidecar-aarch64-apple-darwin",
+        "package:win-x64": "pkg . --targets node18-win-x64 --output ../backend/bin/taxyatra-sidecar-x86_64-pc-windows-msvc.exe"
+    },
+    "pkg": {
+        "scripts": "dist/**/*.js",
+        "assets": [
+            "node_modules/puppeteer-extra-plugin-stealth/**/*",
+            "node_modules/puppeteer-extra-plugin/**/*",
+            "node_modules/merge-deep/**/*",
+            "node_modules/arr-union/**/*",
+            "node_modules/clone-deep/**/*",
+            "node_modules/kind-of/**/*",
+            "node_modules/lazy-cache/**/*",
+            "node_modules/extend-shallow/**/*",
+            "node_modules/shallow-clone/**/*",
+            "node_modules/mixin-object/**/*",
+            "node_modules/is-plain-object/**/*",
+            "node_modules/for-in/**/*",
+            "node_modules/for-own/**/*",
+            "node_modules/is-extendable/**/*",
+            "node_modules/is-buffer/**/*",
+            "node_modules/isobject/**/*",
+            "node_modules/isarray/**/*"
+        ]
+    }
+}

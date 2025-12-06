@@ -1,175 +1,61 @@
 {
   "name": "taxyatra",
-  "productName": "taxyatra",
+  "productName": "TaxYatra",
   "version": "1.0.0",
-  "description": "My Electron application description",
-  "main": "dist/main/index.js",
+  "description": "Tax filing assistant application",
+  "private": true,
   "scripts": {
-    "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:electron\"",
-    "dev:renderer": "vite --config vite.renderer.config.ts",
-    "dev:electron": "wait-on http://localhost:5173 && vite build --mode development --config vite.main.config.ts && vite build --mode development --config vite.preload.config.ts && cross-env NODE_ENV=development electron .",
+    "dev": "cd backend && tauri dev",
+    "dev:web": "vite --config vite.renderer.config.ts",
+    "build": "npm run build:sidecar && cd backend && tauri build",
+    "build:windows": "npm run build:sidecar:all && cd backend && tauri build --target x86_64-pc-windows-msvc",
+    "build:web": "vite build --config vite.renderer.config.ts",
+    "build:sidecar": "cd sidecar && npm run build:pkg",
+    "build:sidecar:all": "cd sidecar && npm run build:pkg:all",
+    "build:sidecar:win": "cd sidecar && npm run build:pkg:win",
     "start": "npm run dev",
-    "lint": "eslint --ext .ts,.tsx .",
-    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
-    "build:main": "vite build --config vite.main.config.ts",
-    "build:renderer": "vite build --config vite.renderer.config.ts",
-    "build:preload": "vite build --config vite.preload.config.ts",
-    "dist": "npm run build && electron-builder build",
-    "dist:win": "npm run build && electron-builder build --win --x64 --ia32",
-    "dist:mac": "npm run build && electron-builder build --mac --x64 --arm64",
-    "dist:linux": "npm run build && electron-builder build --linux",
-    "dist:all": "npm run build && electron-builder build -mwl",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "lint": "eslint --ext .ts,.tsx ."
   },
-  "build": {
-    "appId": "com.taxyatra.app",
-    "productName": "TaxYatra",
-    "directories": {
-      "output": "dist_electron",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "package.json",
-      ".env",
-      "src/resources/**/*"
-    ],
-    "asarUnpack": [
-      "**/*.node",
-      "**/better-sqlite3/**"
-    ],
-    "extraResources": [
-      {
-        "from": "src/resources",
-        "to": "resources"
-      }
-    ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "anshuman2121",
-        "repo": "taxyatra"
-      }
-    ],
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "build/icon.icns",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "category": "public.app-category.finance",
-      "darkModeSupport": true,
-      "identity": null
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "window": {
-        "width": 540,
-        "height": 380
-      },
-      "icon": "build/icon.icns"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "icon": "build/icon.ico"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "icon": "build/icon.png",
-      "category": "Office"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "perMachine": true,
-      "allowElevation": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "TaxYatra",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
-      "deleteAppDataOnUninstall": true,
-      "runAfterFinish": true,
-      "include": "build/installer.nsh"
-    },
-    "afterPack": "./afterPack.js"
-  },
-  "keywords": [],
+  "keywords": [
+    "tax",
+    "finance",
+    "itr"
+  ],
   "author": {
     "name": "anshuman2121",
     "email": "anshuman2121@gmail.com"
   },
   "license": "MIT",
   "devDependencies": {
-    "@electron/rebuild": "^4.0.1",
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/crypto-js": "^4.2.2",
-    "@types/electron-squirrel-startup": "^1.0.2",
+    "@tauri-apps/cli": "^2.9.5",
     "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.1",
-    "cross-env": "^10.1.0",
-    "electron": "^39.2.3",
-    "electron-builder": "^26.0.12",
     "eslint": "^9.39.1",
     "eslint-plugin-import": "^2.32.0",
-    "fs-extra": "^11.3.2",
+    "pkg": "^5.8.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.3",
-    "vite": "^7.2.4",
-    "wait-on": "^9.0.3"
+    "vite": "^7.2.4"
   },
   "dependencies": {
-    "@puppeteer/browsers": "^2.11.0",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.16",
+    "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/plugin-shell": "^2.3.3",
+    "@tauri-apps/plugin-sql": "^2.3.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "axios": "^1.13.1",
-    "axios-cookiejar-support": "^6.0.4",
-    "better-sqlite3": "^12.4.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "crypto-js": "^4.2.0",
-    "dotenv": "^17.2.3",
-    "electron-squirrel-startup": "^1.0.1",
-    "electron-store": "^11.0.2",
-    "find-chrome-bin": "^2.0.4",
     "lucide-react": "^0.554.0",
-    "node-machine-id": "^1.1.12",
-    "puppeteer-core": "^24.32.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwind-merge": "^3.3.1",
-    "tough-cookie": "^6.0.0",
     "zod": "^4.1.12"
   }
 }

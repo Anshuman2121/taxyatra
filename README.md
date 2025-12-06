@@ -1,67 +1,103 @@
 # TaxYatra
 
-Electron app with React, TypeScript, Tailwind CSS, and shadcn/ui.
+A Tauri desktop app for tax filing assistance with React, TypeScript, and Tailwind CSS.
 
-## Setup Commands
+## Prerequisites
 
-### Initial Setup
+### All Platforms
+- **Node.js 18+** - [Download](https://nodejs.org)
+- **Rust** - [Install](https://rustup.rs)
+
+### Windows Additional Requirements
+- **Visual Studio Build Tools 2022** - [Download](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+
+#### For Windows x64:
+1. Install Build Tools, select "Desktop development with C++"
+2. Ensure these are checked:
+   - MSVC v143 x64/x86 build tools
+   - Windows 10/11 SDK
+
+#### For Windows ARM64 (Surface Pro, etc.):
+1. Install Build Tools, go to "Individual Components"
+2. Search and install:
+   - MSVC v143 ARM64 build tools
+   - Windows 11 SDK
+
+---
+
+## Quick Start
+
 ```bash
-npx create-electron-app@latest taxyatra --template=vite-typescript
+# Install dependencies
+npm install
+cd sidecar && npm install && cd ..
+
+# Run in development mode
+npm run dev
 ```
 
-### Install Dependencies
+---
+
+## Build for Production
+
+### macOS
 ```bash
-npm install react react-dom @types/react @types/react-dom
-npm install -D tailwindcss postcss autoprefixer @vitejs/plugin-react
-npm install class-variance-authority clsx tailwind-merge lucide-react
+npm run build
+```
+Output: `backend/target/release/bundle/`
+
+### Windows
+Run from **Developer Command Prompt for VS 2022**:
+```cmd
+npm run build:windows
+```
+Output: `backend/target/release/bundle/nsis/TaxYatra_x.x.x_x64-setup.exe`
+
+---
+
+## Project Structure
+
+```
+taxyatra/
+├── frontend/          # React UI (Vite)
+│   ├── api/           # API layer (Tauri + WebSocket)
+│   ├── components/    # UI components
+│   └── pages/         # App pages
+├── backend/           # Tauri Rust backend
+│   ├── src/           # Rust code
+│   ├── bin/           # Sidecar binaries
+│   └── migrations/    # SQLite migrations
+└── sidecar/           # Node.js sidecar (Puppeteer)
+    └── services/      # Browser automation
 ```
 
-### Add shadcn/ui Components
-```bash
-npx shadcn@latest add button
-```
+---
 
-## Development
+## Available Scripts
 
-### Start Development Server
-```bash
-npm start
-```
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development mode |
+| `npm run build` | Build for current platform |
+| `npm run build:windows` | Build for Windows |
+| `npm run build:sidecar` | Build sidecar only (macOS) |
+| `npm run build:sidecar:all` | Build sidecar for all platforms |
 
-### Build for Production
+---
 
-You can build the app for specific platforms or all at once.
+## Troubleshooting
 
-**Build for All Platforms:**
-```bash
-npm run dist:all
-```
+### Windows: "linker `link.exe` not found"
+→ Use **Developer Command Prompt for VS 2022**, not PowerShell
 
-**Build for Windows:**
-```bash
-npm run dist:win
-```
+### Windows ARM64: "library machine type 'x86' conflicts with ARM64"
+→ Install ARM64 build tools (see Prerequisites above)
 
-**Build for Mac:**
-```bash
-npm run dist:mac
-```
+### macOS: Permission denied
+→ Run `chmod +x backend/bin/*`
 
-**Build for Linux:**
-```bash
-npm run dist:linux
-```
+---
 
-### Where are the files?
-After the build completes, go to the `dist_electron` folder in your project directory.
+## License
 
-- **Windows:** You will find the `.exe` installer here (e.g., `TaxYatra Setup 1.0.0.exe`).
-- **Mac:** You will find the `.dmg` file here (e.g., `TaxYatra-1.0.0.dmg`).
-- **Linux:** You will find `.AppImage` and `.deb` files here.
-
-## One-Line Setup (Future Reference)
-```bash
-npx create-electron-app@latest taxyatra --template=vite-typescript && cd taxyatra && npm install react react-dom @types/react @types/react-dom && npm install -D tailwindcss postcss autoprefixer @vitejs/plugin-react && npm install class-variance-authority clsx tailwind-merge lucide-react
-```
-
-
+MIT

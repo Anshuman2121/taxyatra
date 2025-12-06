@@ -6,10 +6,10 @@ export default defineConfig(async () => {
   return {
     plugins: [react.default()],
     base: './',
-    root: 'src/frontend',
+    root: 'frontend',
     publicDir: 'assets',
     build: {
-      outDir: '../../dist/renderer',
+      outDir: '../dist/renderer',
       emptyOutDir: true,
       minify: process.env.NODE_ENV === 'production',
       sourcemap: process.env.NODE_ENV === 'development',
